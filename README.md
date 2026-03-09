@@ -1,3 +1,8 @@
+> ⚠️ **DEVELOPMENT STATUS — NOT FOR PRODUCTION USE**
+> PoolManager is currently in active development and has not been security audited.
+> Do NOT use this software to manage real funds or production stake pools at this stage.
+> Use at your own risk.
+
 # PoolManager
 
 A professional graphical desktop application for Cardano stake pool operators.
