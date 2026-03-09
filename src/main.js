@@ -4,9 +4,163 @@ import { invoke } from '@tauri-apps/api/tauri'
 // ── STATE ──
 let connected = false
 
+// ── SETTINGS HELPER ──
+function cfg() {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  const home = s.cnodehome || '/opt/cardano/cnode'
+  const pool = s.poolname || 'POOL'
+  const net  = s.network  || 'mainnet'
+  return {
+    home,
+    pool,
+    net,
+    netflag:  net === 'mainnet' ? '--mainnet' : '--testnet-magic 1',
+    env:      `${home}/scripts/env`,
+    lib:      `${home}/scripts/cntools.library`,
+    opcert:   `${home}/priv/pool/${pool}/op.cert`,
+    wallets:  `${home}/priv/wallet/`,
+    assets:   `${home}/priv/asset/`,
+    promport: s.promport || '12799',
+    decrypt:  s.decryptscript || '',
+    encrypt:  s.encryptscript || '',
+  }
+}
+
 // ── RENDER ──
 document.querySelector('#app').innerHTML = `
+<!-- SETUP WIZARD -->
+<div id="wizard-screen" style="display:none">
+  <div class="connect-box" style="max-width:560px">
 
+    <!-- Step 1: Welcome -->
+    <div class="wizard-step" id="wz-1">
+      <div class="connect-logo">
+        <h1>Pool<span style="color:var(--accent)">Manager</span></h1>
+        <p style="color:var(--text-muted);font-size:13px;line-height:1.6;margin-top:12px">
+          A graphical desktop application that combines the functionality of
+          <strong>cntools</strong> and <strong>gLiveView</strong> from the
+          <a href="https://cardano-community.github.io/guild-operators/" style="color:var(--accent)">Guild Operators</a>
+          suite into a single rich interface.<br><br>
+          Full credit and thanks to the Guild Operators / Koios team for
+          <strong>cntools</strong> and <strong>gLiveView</strong> — this application
+          builds on top of their work and requires their tools to be installed on your node.
+          PoolManager is open source under Apache 2.0.
+        </p>
+      </div>
+      <div style="background:rgba(0,83,255,0.08);border:1px solid var(--accent);border-radius:8px;padding:14px;margin:16px 0;font-size:13px;color:var(--text)">
+        This wizard will guide you through setup in about 2 minutes.<br>
+        You can re-run it any time from the Settings panel.
+      </div>
+      <button class="btn btn-primary" onclick="wzGo(2)">Get Started →</button>
+    </div>
+
+    <!-- Step 2: SSH Connection -->
+    <div class="wizard-step" id="wz-2" style="display:none">
+      <div class="panel-title" style="margin-bottom:4px">Step 1 of 3 — Connect to your node</div>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Enter your node's SSH connection details.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Hostname / IP</label>
+          <input id="wz-host" type="text" placeholder="hostname or IP" />
+        </div>
+        <div class="form-group port">
+          <label>Port</label>
+          <input id="wz-port" type="text" placeholder="22" value="22" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="wz-user" type="text" placeholder="username" />
+      </div>
+      <div class="form-group">
+        <label>Authentication Order</label>
+        <select id="wz-order" onchange="document.getElementById('wz-totp-group').style.display=this.value==='password_only'?'none':'block'">
+          <option value="totp_first">Authenticator code then Password</option>
+          <option value="password_first">Password then Authenticator code</option>
+          <option value="password_only">Password only</option>
+        </select>
+      </div>
+      <div class="form-group" id="wz-totp-group">
+        <label>Google Authenticator Code</label>
+        <input id="wz-totp" type="text" placeholder="123456" maxlength="6" />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="wz-pass" type="password" placeholder="password" />
+      </div>
+      <div id="wz-conn-error" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-action" onclick="wzGo(1)">← Back</button>
+        <button class="btn btn-primary" style="flex:1" id="wz-conn-btn" onclick="wzConnect()">Test Connection →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Node Configuration -->
+    <div class="wizard-step" id="wz-3" style="display:none">
+      <div class="panel-title" style="margin-bottom:4px">Step 2 of 3 — Node configuration</div>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Enter your env file path and pool name. Everything else is detected automatically.</p>
+      <div class="form-group">
+        <label>Path to env file</label>
+        <input id="wz-envpath" type="text" placeholder="/path/to/cnode/scripts/env" />
+      </div>
+      <div class="form-group">
+        <label>Pool Name (folder name under priv/pool/)</label>
+        <input id="wz-poolname" type="text" placeholder="Your pool folder name e.g. MYPOOL" />
+      </div>
+      <div class="form-group">
+        <label>Network</label>
+        <select id="wz-network">
+          <option value="mainnet">Mainnet</option>
+          <option value="preprod">Preprod</option>
+          <option value="preview">Preview</option>
+        </select>
+      </div>
+      <button class="btn-action success" onclick="wzDetect()" style="margin-bottom:12px">Auto-Detect from env file</button>
+      <div class="terminal" id="wz-detect-terminal" style="min-height:80px;margin-bottom:12px;font-size:12px">Click Auto-Detect to read your node configuration...</div>
+      <div id="wz-node-error" style="color:var(--danger);font-size:13px;margin-bottom:8px;display:none"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-action" onclick="wzGo(2)">← Back</button>
+        <button class="btn btn-primary" style="flex:1" onclick="wzSaveNode()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Key Scripts -->
+    <div class="wizard-step" id="wz-4" style="display:none">
+      <div class="panel-title" style="margin-bottom:4px">Step 3 of 3 — Key scripts (optional)</div>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:4px">
+        If you have custom encrypt/decrypt scripts, enter their paths here.<br>
+        Leave blank to use cntools.library built-in functions.
+      </p>
+      <div class="form-group">
+        <label>Decrypt keys script</label>
+        <input id="wz-decrypt" type="text" placeholder="Optional: /path/to/your/decrypt-keys.sh" />
+      </div>
+      <div class="form-group">
+        <label>Encrypt keys script</label>
+        <input id="wz-encrypt" type="text" placeholder="Optional: /path/to/your/encrypt-keys.sh" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-action" onclick="wzGo(3)">← Back</button>
+        <button class="btn-action" onclick="wzFinish()">Skip</button>
+        <button class="btn btn-primary" style="flex:1" onclick="wzFinish()">Finish Setup →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Done -->
+    <div class="wizard-step" id="wz-5" style="display:none">
+      <div style="text-align:center;padding:16px 0">
+        <div style="font-size:48px;margin-bottom:12px">✓</div>
+        <div class="panel-title" style="margin-bottom:8px">You're all set!</div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">
+          PoolManager is configured and ready to use.<br>
+          You can update any settings at any time from the Settings panel.
+        </p>
+        <button class="btn btn-primary" onclick="wzLaunch()">Launch PoolManager →</button>
+      </div>
+    </div>
+
+  </div>
+</div>
 <!-- CONNECTION SCREEN -->
 <div id="connect-screen">
   <div class="connect-box">
@@ -139,7 +293,7 @@ document.querySelector('#app').innerHTML = `
         <div class="card-grid">
           <div class="card">
             <div class="card-label">Pool Status</div>
-            <div class="card-value success" id="stat-pool">GNP1</div>
+            <div class="card-value success" id="stat-pool">--</div>
             <div class="card-sub" id="stat-pool-sub">Block Producer</div>
           </div>
           <div class="card">
@@ -285,7 +439,7 @@ document.querySelector('#app').innerHTML = `
 
             <div class="form-group">
               <label>Pool Name (folder name under priv/pool/)</label>
-              <input id="s-poolname" type="text" placeholder="GNP1" />
+              <input id="s-poolname" type="text" placeholder="Your pool folder name e.g. MYPOOL" />
             </div>
 
             <div class="form-group">
@@ -302,7 +456,7 @@ document.querySelector('#app').innerHTML = `
             </button>
           </div>
 
-          <div class="card" style="margin-bottom:16px" id="detected-settings" style="display:none">
+          <div class="card" id="detected-settings" style="margin-bottom:16px;display:none">
             <div class="card-label" style="margin-bottom:16px">Detected Configuration</div>
             <div class="terminal" id="settings-terminal" style="min-height:120px">
               Click Auto-Detect to load configuration from your node...
@@ -366,8 +520,11 @@ document.querySelector('#app').innerHTML = `
          <button class="btn btn-primary" style="width:auto;padding:10px 32px" onclick="saveSettings()">
             Save Settings
           </button>
-          <button class="btn-action danger" style="margin-left:12px" onclick="resetSettings()">
+         <button class="btn-action danger" style="margin-left:12px" onclick="resetSettings()">
             Reset Settings
+          </button>
+          <button class="btn-action" style="margin-left:12px" onclick="rerunWizard()">
+            Re-run Setup Wizard
           </button>
           <span id="settings-saved" style="color:var(--success);margin-left:12px;font-size:13px;display:none">
             ✓ Settings saved
@@ -481,10 +638,16 @@ async function run(command, terminalId) {
 // ── DASHBOARD ──
 async function loadDashboard() {
   const term = document.getElementById('dashboard-terminal')
+  const c = cfg()
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  if (!s.cnodehome) {
+    term.textContent = '⚠️ Node not configured yet.\n\nPlease go to Settings → Re-run Setup Wizard, or configure your node path in the Settings panel.'
+    return
+  }
   term.textContent = 'Loading node info...'
   try {
     const r = await invoke('ssh_run', {
-      command: 'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query tip --mainnet 2>/dev/null'
+      command: `source ${c.env} && cardano-cli query tip ${c.netflag} 2>/dev/null`
     })
     if (r.success && r.output) {
       try {
@@ -508,7 +671,7 @@ async function loadDashboard() {
 // Load KES info
   try {
     const kes = await invoke('ssh_run', {
-      command: 'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query kes-period-info --mainnet --op-cert-file /opt/cardano/cnode_bp/priv/pool/GNP1/op.cert 2>/dev/null'
+      command: `source ${c.env} && cardano-cli query kes-period-info ${c.netflag} --op-cert-file ${c.opcert} 2>/dev/null`
     })
     if (kes.success && kes.output) {
       const match = kes.output.match(/"qKesKesKeyExpiry":\s*"([^"]+)"/)
@@ -527,39 +690,41 @@ async function loadDashboard() {
 }
 
 // ── POOL ──
-window.runPoolInfo = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query tip --mainnet 2>/dev/null',
-  'pool-terminal'
-)
+window.runPoolInfo = () => {
+  const c = cfg()
+  run(`source ${c.env} && cardano-cli query tip ${c.netflag} 2>/dev/null`, 'pool-terminal')
+}
 
 window.confirmRetire = () => {
   if (confirm('WARNING: This will begin pool retirement. Are you absolutely sure?')) {
-    run('source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && deRegisterPool', 'pool-terminal')
+    const c = cfg()
+    run(`source ${c.env} && source ${c.lib} && deRegisterPool`, 'pool-terminal')
   }
 }
 
 // ── KES ──
-window.checkKES = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query kes-period-info --mainnet --op-cert-file /opt/cardano/cnode_bp/priv/pool/GNP1/op.cert 2>/dev/null',
-  'kes-terminal'
-)
+window.checkKES = () => {
+  const c = cfg()
+  run(`source ${c.env} && cardano-cli query kes-period-info ${c.netflag} --op-cert-file ${c.opcert} 2>/dev/null`, 'kes-terminal')
+}
 window.confirmRotateKES = () => {
   if (confirm('Rotate KES keys? This will update your operational certificate.')) {
-    run('source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && rotatePoolKeys', 'kes-terminal')
+    const c = cfg()
+    run(`source ${c.env} && source ${c.lib} && rotatePoolKeys`, 'kes-terminal')
   }
 }
 
 // ── BLOCKS ──
-window.runBlocks = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && echo "Block stats via cncli or gLiveView" && ls /opt/cardano/cnode_bp/scripts/',
-  'blocks-terminal'
-)
+window.runBlocks = () => {
+  const c = cfg()
+  run(`source ${c.env} && echo "Block stats via cncli or gLiveView" && ls ${c.home}/scripts/`, 'blocks-terminal')
+}
 
 // ── WALLET ──
-window.listWallets = () => run(
-  'ls /opt/cardano/cnode_bp/priv/wallet/ 2>/dev/null || echo "No wallets found at default path"',
-  'wallet-terminal'
-)
+window.listWallets = () => {
+  const c = cfg()
+  run(`ls ${c.wallets} 2>/dev/null || echo "No wallets found"`, 'wallet-terminal')
+}
 
 // ── SEND ──
 window.confirmSend = () => {
@@ -568,38 +733,40 @@ window.confirmSend = () => {
   const amount = document.getElementById('send-amount').value
   if (!from || !to || !amount) { alert('Please fill in all fields'); return }
   if (confirm('Send ' + amount + ' ADA from ' + from + ' to ' + to + '?')) {
-    run('source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && sendAssets', 'send-terminal')
+    const c = cfg()
+    run(`source ${c.env} && source ${c.lib} && sendAssets`, 'send-terminal')
   }
 }
 
 // ── REWARDS ──
-window.checkRewards = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && getWalletRewards 2>/dev/null || echo "Specify wallet name"',
-  'rewards-terminal'
-)
+window.checkRewards = () => {
+  const c = cfg()
+  run(`source ${c.env} && source ${c.lib} && getWalletRewards 2>/dev/null || echo "Specify wallet name"`, 'rewards-terminal')
+}
 
 window.confirmWithdraw = () => {
   if (confirm('Withdraw all available rewards?')) {
-    run('source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && withdrawRewards', 'rewards-terminal')
+    const c = cfg()
+    run(`source ${c.env} && source ${c.lib} && withdrawRewards`, 'rewards-terminal')
   }
 }
 
 // ── GOVERNANCE ──
-window.checkDRep = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && getDRepStatus 2>/dev/null',
-  'governance-terminal'
-)
+window.checkDRep = () => {
+  const c = cfg()
+  run(`source ${c.env} && source ${c.lib} && getDRepStatus 2>/dev/null`, 'governance-terminal')
+}
 
-window.listGovActions = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && getActiveGovActionCount 2>/dev/null',
-  'governance-terminal'
-)
+window.listGovActions = () => {
+  const c = cfg()
+  run(`source ${c.env} && source ${c.lib} && getActiveGovActionCount 2>/dev/null`, 'governance-terminal')
+}
 
 // ── ASSETS ──
-window.listAssets = () => run(
-  'ls /opt/cardano/cnode_bp/priv/asset/ 2>/dev/null || echo "No assets found"',
-  'assets-terminal'
-)
+window.listAssets = () => {
+  const c = cfg()
+  run(`ls ${c.assets} 2>/dev/null || echo "No assets found"`, 'assets-terminal')
+}
 
 // ── SECURITY ──
 window.promptDecrypt = () => {
@@ -677,7 +844,7 @@ document.getElementById('c-profile').addEventListener('change', function() {
 })
 
 loadProfileDropdown()
-
+checkFirstRun()
 // ── AUTO REFRESH ──
 let refreshInterval = null
 
@@ -686,7 +853,7 @@ function startAutoRefresh() {
   refreshInterval = setInterval(async () => {
     try {
       const r = await invoke('ssh_run', {
-        command: 'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query tip --mainnet 2>/dev/null'
+        command: (() => { const c = cfg(); return `source ${c.env} && cardano-cli query tip ${c.netflag} 2>/dev/null` })()
       })
       if (r.success && r.output) {
         const tip = JSON.parse(r.output)
@@ -811,6 +978,7 @@ window.saveSettings = () => {
 function applySettings() {
   const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
   loadSettings()
+  if (s.poolname) document.getElementById('stat-pool').textContent = s.poolname
 }
 window.resetSettings = () => {
   if (confirm('Clear all saved settings?')) {
@@ -824,6 +992,167 @@ window.resetSettings = () => {
     ;['d-cnodehome','d-poolname','d-poolid','d-ticker','d-nodeport','d-promport','d-library','d-opcert','d-nodeversion'].forEach(id => {
       document.getElementById(id).textContent = '—'
     })
+  }
+}
+window.rerunWizard = () => {
+  document.getElementById('main-app').classList.remove('show')
+  stopAutoRefresh()
+  document.getElementById('wizard-screen').style.display = 'flex'
+  wzGo(1)
+}
+// ── SETUP WIZARD ──
+let wizardProfile = null
+let wizardSettings = null
+
+window.wzGo = function(step) {
+  document.querySelectorAll('.wizard-step').forEach(s => s.style.display = 'none')
+  document.getElementById('wz-' + step).style.display = 'block'
+}
+
+window.wzConnect = async () => {
+  const btn = document.getElementById('wz-conn-btn')
+  const err = document.getElementById('wz-conn-error')
+  err.style.display = 'none'
+
+  const host     = document.getElementById('wz-host').value.trim()
+  const port     = parseInt(document.getElementById('wz-port').value) || 22
+  const username = document.getElementById('wz-user').value.trim()
+  const order    = document.getElementById('wz-order').value
+  const totp     = document.getElementById('wz-totp').value.trim()
+  const password = document.getElementById('wz-pass').value
+
+  if (!host || !username || !password) {
+    err.textContent = 'Please fill in host, username and password'
+    err.style.display = 'block'
+    return
+  }
+
+  btn.disabled = true
+  btn.textContent = 'Connecting...'
+
+  try {
+    const result = await invoke('ssh_connect', {
+      profile: { host, port, username, auth_order: order, totp_code: totp, password }
+    })
+    if (result.success) {
+      wizardProfile = { host, port, username, order }
+      saveProfile(host, port, username, order)
+      document.getElementById('conn-label').textContent = username + '@' + host
+      wzGo(3)
+    } else {
+      err.textContent = result.error || 'Connection failed — check your details and try again'
+      err.style.display = 'block'
+    }
+  } catch(e) {
+    err.textContent = 'Connection failed: ' + String(e)
+    err.style.display = 'block'
+  }
+
+  btn.disabled = false
+  btn.textContent = 'Test Connection →'
+}
+
+window.wzDetect = async () => {
+  const envpath  = document.getElementById('wz-envpath').value.trim()
+  const poolname = document.getElementById('wz-poolname').value.trim()
+  const term     = document.getElementById('wz-detect-terminal')
+
+  if (!envpath) { 
+    term.textContent = '⚠️ Please enter your env file path first'
+    return 
+  }
+
+  term.textContent = 'Reading env file...'
+
+  try {
+    const normalEnvpath = envpath.endsWith('/env') ? envpath : envpath.replace(/\/?$/, '/env')
+    const cnodehome = normalEnvpath.replace('/scripts/env', '')
+    document.getElementById('wz-envpath').value = normalEnvpath
+
+    const envResult = await invoke('ssh_run', {
+      command: 'cat ' + normalEnvpath + ' | grep -v "^#" | grep -v "^$" | grep "^[A-Z_]*="'
+    })
+
+    const envText = envResult.output || ''
+    wizardSettings = { envpath: normalEnvpath, cnodehome, poolname }
+
+    const poolid      = envText.match(/^POOL_ID="?([^"\n]+)"?/m)
+    const ticker      = envText.match(/^POOL_TICKER="?([^"\n]+)"?/m)
+    const nodeport    = envText.match(/^CNODE_PORT=([^\s\n]+)/m)
+    const detectedPool = envText.match(/^POOL_NAME="?([^"\n]+)"?/m)
+    const network     = document.getElementById('wz-network').value
+
+    if (poolid)       wizardSettings.poolid   = poolid[1].trim()
+    if (ticker)       wizardSettings.ticker   = ticker[1].trim()
+    if (nodeport)     wizardSettings.nodeport = nodeport[1].trim()
+    wizardSettings.poolname = poolname || (detectedPool ? detectedPool[1].trim() : '')
+    wizardSettings.network  = network
+    wizardSettings.netflag  = network === 'mainnet' ? '--mainnet' : '--testnet-magic 1'
+
+    if (detectedPool && !poolname) 
+      document.getElementById('wz-poolname').value = wizardSettings.poolname
+
+    const configResult = await invoke('ssh_run', {
+      command: 'grep -o "PrometheusSimple [^ ]* [0-9]*" ' + cnodehome + '/files/config.json 2>/dev/null'
+    })
+    const promMatch = configResult.output.match(/PrometheusSimple\s+\S+\s+(\d+)/)
+    wizardSettings.promport = promMatch ? promMatch[1] : '12799'
+
+    const metricsResult = await invoke('ssh_run', {
+      command: 'curl -s http://127.0.0.1:' + wizardSettings.promport + '/metrics 2>/dev/null | grep cardano_node_metrics_cardano_build_info'
+    })
+    const versionMatch = metricsResult.output.match(/version="([^"]+)"/)
+    wizardSettings.nodeversion = versionMatch ? versionMatch[1] : 'Unknown'
+
+    term.textContent = 
+      '✓ Detected successfully\n\n' +
+      'CNODE_HOME:   ' + cnodehome + '\n' +
+      'Pool Name:    ' + wizardSettings.poolname + '\n' +
+      'Pool ID:      ' + (wizardSettings.poolid || 'not found') + '\n' +
+      'Ticker:       ' + (wizardSettings.ticker || 'not found') + '\n' +
+      'Node Port:    ' + (wizardSettings.nodeport || 'not found') + '\n' +
+      'Prometheus:   ' + wizardSettings.promport + '\n' +
+      'Node Version: ' + wizardSettings.nodeversion
+
+  } catch(e) {
+    term.textContent = '✗ Detection failed: ' + String(e)
+  }
+}
+
+window.wzSaveNode = () => {
+  const err = document.getElementById('wz-node-error')
+  if (!wizardSettings || !wizardSettings.cnodehome) {
+    err.textContent = '⚠️ Please run Auto-Detect first to verify your node configuration'
+    err.style.display = 'block'
+    return
+  }
+  err.style.display = 'none'
+  wzGo(4)
+}
+
+window.wzFinish = () => {
+  if (!wizardSettings) return
+  wizardSettings.decryptscript = document.getElementById('wz-decrypt').value.trim()
+  wizardSettings.encryptscript = document.getElementById('wz-encrypt').value.trim()
+  localStorage.setItem('pm_settings', JSON.stringify(wizardSettings))
+  applySettings()
+  wzGo(5)
+}
+
+window.wzLaunch = () => {
+  document.getElementById('wizard-screen').style.display = 'none'
+  connected = true
+  document.getElementById('connect-screen').style.display = 'none'
+  document.getElementById('main-app').classList.add('show')
+  loadDashboard()
+  startAutoRefresh()
+}
+
+function checkFirstRun() {
+  const s = localStorage.getItem('pm_settings')
+  if (!s || Object.keys(JSON.parse(s)).length === 0) {
+    document.getElementById('wizard-screen').style.display = 'flex'
+    document.getElementById('connect-screen').style.display = 'none'
   }
 }
 // ── KEY STATUS ──
