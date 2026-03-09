@@ -122,8 +122,11 @@ document.querySelector('#app').innerHTML = `
         <div class="nav-item" data-panel="security">
           <span class="nav-icon">&#128272;</span> Security
         </div>
-        <div class="nav-item" data-panel="terminal">
+       <div class="nav-item" data-panel="terminal">
           <span class="nav-icon">&#9000;</span> Terminal
+        </div>
+        <div class="nav-item" data-panel="settings">
+          <span class="nav-icon">&#9881;</span> Settings
         </div>
       </div>
     </div>
@@ -262,7 +265,113 @@ document.querySelector('#app').innerHTML = `
         </div>
         <div class="terminal" id="security-terminal">Key status will appear here...</div>
       </div>
+<!-- SETTINGS -->
+      <div class="panel" id="panel-settings">
+        <div class="panel-title">Settings</div>
 
+        <div style="max-width:600px">
+
+          <div style="background:rgba(0,83,255,0.08);border:1px solid var(--accent);border-radius:8px;padding:16px;margin-bottom:24px;font-size:13px;color:var(--text)">
+            Enter your env file path (or just the scripts directory) and pool name. Everything else is detected automatically. Key scripts are optional — leave blank to use cntools.library built-in functions.
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-label" style="margin-bottom:16px">Node Configuration</div>
+
+            <div class="form-group">
+              <label>Path to env file</label>
+              <input id="s-envpath" type="text" placeholder="/path/to/cnode/scripts/env" />
+            </div>
+
+            <div class="form-group">
+              <label>Pool Name (folder name under priv/pool/)</label>
+              <input id="s-poolname" type="text" placeholder="GNP1" />
+            </div>
+
+            <div class="form-group">
+              <label>Network</label>
+              <select id="s-network">
+                <option value="mainnet">Mainnet</option>
+                <option value="preprod">Preprod</option>
+                <option value="preview">Preview</option>
+              </select>
+            </div>
+
+            <button class="btn-action success" onclick="detectSettings()" style="margin-top:8px">
+              Auto-Detect from env file
+            </button>
+          </div>
+
+          <div class="card" style="margin-bottom:16px" id="detected-settings" style="display:none">
+            <div class="card-label" style="margin-bottom:16px">Detected Configuration</div>
+            <div class="terminal" id="settings-terminal" style="min-height:120px">
+              Click Auto-Detect to load configuration from your node...
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-label" style="margin-bottom:16px">Detected Values</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted);width:40%">CNODE_HOME</td>
+                <td style="padding:8px 4px" id="d-cnodehome">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">Pool Name</td>
+                <td style="padding:8px 4px" id="d-poolname">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">Pool ID</td>
+                <td style="padding:8px 4px;font-family:monospace;font-size:11px" id="d-poolid">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">Pool Ticker</td>
+                <td style="padding:8px 4px" id="d-ticker">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">Node Port</td>
+                <td style="padding:8px 4px" id="d-nodeport">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">Prometheus Port</td>
+                <td style="padding:8px 4px" id="d-promport">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">cntools.library</td>
+                <td style="padding:8px 4px" id="d-library">—</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 4px;color:var(--text-muted)">op.cert path</td>
+                <td style="padding:8px 4px" id="d-opcert">—</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 4px;color:var(--text-muted)">Node Version</td>
+                <td style="padding:8px 4px" id="d-nodeversion">—</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-label" style="margin-bottom:16px">Key Scripts</div>
+            <div class="form-group">
+              <label>Decrypt keys script path</label>
+              <input id="s-decryptscript" type="text" placeholder="Optional: /path/to/your/decrypt-keys.sh" />
+            </div>
+            <div class="form-group">
+              <label>Encrypt keys script path</label>
+              <input id="s-encryptscript" type="text" placeholder="Optional: /path/to/your/encrypt-keys.sh" /> 
+            </div>
+          </div>
+
+          <button class="btn btn-primary" style="width:auto;padding:10px 32px" onclick="saveSettings()">
+            Save Settings
+          </button>
+          <span id="settings-saved" style="color:var(--success);margin-left:12px;font-size:13px;display:none">
+            ✓ Settings saved
+          </span>
+
+        </div>
+      </div>
       <!-- TERMINAL -->
       <div class="panel" id="panel-terminal">
         <div class="panel-title">Terminal</div>
@@ -328,7 +437,8 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
       document.getElementById('connect-screen').style.display = 'none'
       document.getElementById('main-app').classList.add('show')
       document.getElementById('conn-label').textContent = username + '@' + host
-      saveProfile(host, port, username, order)
+     saveProfile(host, port, username, order)
+      applySettings()
       loadDashboard()
       startAutoRefresh()
     } else {
@@ -490,21 +600,28 @@ window.listAssets = () => run(
 
 // ── SECURITY ──
 window.promptDecrypt = () => {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  const cnodehome = s.cnodehome || ''
+  const customScript = s.decryptscript || ''
   const pwd = prompt('Enter key encryption password:')
-  if (pwd) run(
-    'bash /opt/cardano/cnode_bp/priv/decrypt_keys.sh "' + pwd + '" 2>/dev/null || echo "Decrypt script not found - please configure path in Security panel"',
-    'security-terminal'
-  )
+  if (!pwd) return
+  const cmd = customScript
+    ? `bash "${customScript}" "${pwd}" 2>/dev/null || echo "Custom decrypt script not found at ${customScript}"`
+    : `source ${cnodehome}/scripts/env && source ${cnodehome}/scripts/cntools.library && decryptFile ${cnodehome}/priv "${pwd}" 2>/dev/null`
+  run(cmd, 'security-terminal')
 }
 
 window.promptEncrypt = () => {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  const cnodehome = s.cnodehome || ''
+  const customScript = s.encryptscript || ''
   const pwd = prompt('Enter password to re-encrypt keys:')
-  if (pwd && confirm('Encrypt keys and securely wipe unencrypted files?')) {
-    run(
-      'bash /opt/cardano/cnode_bp/priv/encrypt_keys.sh "' + pwd + '" 2>/dev/null || echo "Encrypt script not found - please configure path in Security panel"',
-      'security-terminal'
-    )
-  }
+  if (!pwd) return
+  if (!confirm('Encrypt keys and securely wipe unencrypted files?')) return
+  const cmd = customScript
+    ? `bash "${customScript}" "${pwd}" 2>/dev/null || echo "Custom encrypt script not found at ${customScript}"`
+    : `source ${cnodehome}/scripts/env && source ${cnodehome}/scripts/cntools.library && encryptFile ${cnodehome}/priv "${pwd}" 2>/dev/null`
+  run(cmd, 'security-terminal')
 }
 
 // ── TERMINAL ──
@@ -585,6 +702,112 @@ function startAutoRefresh() {
 function stopAutoRefresh() {
   if (refreshInterval) clearInterval(refreshInterval)
   refreshInterval = null
+}
+// ── SETTINGS ──
+function loadSettings() {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  if (s.envpath) document.getElementById('s-envpath').value = s.envpath
+  if (s.poolname) document.getElementById('s-poolname').value = s.poolname
+  if (s.network) document.getElementById('s-network').value = s.network
+  if (s.decryptscript) document.getElementById('s-decryptscript').value = s.decryptscript
+  if (s.encryptscript) document.getElementById('s-encryptscript').value = s.encryptscript
+  if (s.cnodehome) updateDetectedTable(s)
+}
+
+function updateDetectedTable(s) {
+  if (s.cnodehome) document.getElementById('d-cnodehome').textContent = s.cnodehome
+  if (s.poolname) document.getElementById('d-poolname').textContent = s.poolname
+  if (s.poolid) document.getElementById('d-poolid').textContent = s.poolid
+  if (s.ticker) document.getElementById('d-ticker').textContent = s.ticker
+  if (s.nodeport) document.getElementById('d-nodeport').textContent = s.nodeport
+  if (s.promport) document.getElementById('d-promport').textContent = s.promport
+  if (s.cnodehome) document.getElementById('d-library').textContent = s.cnodehome + '/scripts/cntools.library'
+  if (s.cnodehome && s.poolname) document.getElementById('d-opcert').textContent = s.cnodehome + '/priv/pool/' + s.poolname + '/op.cert'
+  if (s.nodeversion) document.getElementById('d-nodeversion').textContent = s.nodeversion
+}
+
+window.detectSettings = async () => {
+  const envpath = document.getElementById('s-envpath').value.trim()
+  const poolname = document.getElementById('s-poolname').value.trim()
+  const term = document.getElementById('settings-terminal')
+
+  if (!envpath) { alert('Please enter the env file path first'); return }
+
+  term.textContent = 'Reading env file...'
+
+  try {
+    // Normalise env path — accept directory or full file path
+    const normalEnvpath = envpath.endsWith('/env') ? envpath : envpath.replace(/\/?$/, '/env')
+    const cnodehome = normalEnvpath.replace('/scripts/env', '')
+    document.getElementById('s-envpath').value = normalEnvpath
+
+    // Read env file
+    const envResult = await invoke('ssh_run', {
+    command: 'cat ' + normalEnvpath + ' | grep -v "^#" | grep -v "^$" | grep "^[A-Z_]*="'
+    })
+
+    const envText = envResult.output || ''
+    const s = { envpath, poolname, cnodehome }
+
+    // Parse env variables
+    const poolid = envText.match(/^POOL_ID="?([^"\n]+)"?/m)
+    const ticker = envText.match(/^POOL_TICKER="?([^"\n]+)"?/m)
+    const nodeport = envText.match(/^CNODE_PORT=([^\s\n]+)/m)
+    const detectedPool = envText.match(/^POOL_NAME="?([^"\n]+)"?/m)
+
+    if (poolid) s.poolid = poolid[1].trim()
+    if (ticker) s.ticker = ticker[1].trim()
+    if (nodeport) s.nodeport = nodeport[1].trim()
+    if (detectedPool && !poolname) s.poolname = detectedPool[1].trim()
+    if (detectedPool) s.poolname = poolname || detectedPool[1].trim()
+
+    // Read Prometheus port from config.json
+    const configResult = await invoke('ssh_run', {
+      command: 'grep -o "PrometheusSimple [^ ]* [0-9]*" ' + cnodehome + '/files/config.json 2>/dev/null'
+    })
+    const promMatch = configResult.output.match(/PrometheusSimple\s+\S+\s+(\d+)/)
+    s.promport = promMatch ? promMatch[1] : '12799'
+
+    // Get node version from Prometheus
+    const metricsResult = await invoke('ssh_run', {
+      command: 'curl -s http://127.0.0.1:' + s.promport + '/metrics 2>/dev/null | grep cardano_node_metrics_cardano_build_info'
+    })
+    const versionMatch = metricsResult.output.match(/version="([^"]+)"/)
+    s.nodeversion = versionMatch ? versionMatch[1] : 'Unknown'
+
+    // Don't guess script paths - leave for user to fill in manually
+    s.decryptscript = s.decryptscript || ''
+    s.encryptscript = s.encryptscript || ''
+    updateDetectedTable(s)
+
+    term.textContent = 'Detection complete:\n\n' + JSON.stringify(s, null, 2)
+
+    // Auto-save detected settings
+    localStorage.setItem('pm_settings', JSON.stringify(s))
+
+  } catch(e) {
+    term.textContent = 'Detection failed: ' + String(e)
+  }
+}
+
+window.saveSettings = () => {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  s.envpath = document.getElementById('s-envpath').value.trim()
+  s.poolname = document.getElementById('s-poolname').value.trim()
+  s.network = document.getElementById('s-network').value
+  s.decryptscript = document.getElementById('s-decryptscript').value.trim()
+  s.encryptscript = document.getElementById('s-encryptscript').value.trim()
+  localStorage.setItem('pm_settings', JSON.stringify(s))
+  const saved = document.getElementById('settings-saved')
+  saved.style.display = 'inline'
+  setTimeout(() => saved.style.display = 'none', 3000)
+  updateDetectedTable(s)
+}
+
+// Load settings on startup (after connect)
+function applySettings() {
+  const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  loadSettings()
 }
 // ── KEY STATUS ──
 document.getElementById('key-status')?.addEventListener('click', () => showPanel('security'))
