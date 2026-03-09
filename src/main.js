@@ -363,8 +363,11 @@ document.querySelector('#app').innerHTML = `
             </div>
           </div>
 
-          <button class="btn btn-primary" style="width:auto;padding:10px 32px" onclick="saveSettings()">
+         <button class="btn btn-primary" style="width:auto;padding:10px 32px" onclick="saveSettings()">
             Save Settings
+          </button>
+          <button class="btn-action danger" style="margin-left:12px" onclick="resetSettings()">
+            Reset Settings
           </button>
           <span id="settings-saved" style="color:var(--success);margin-left:12px;font-size:13px;display:none">
             ✓ Settings saved
@@ -808,6 +811,20 @@ window.saveSettings = () => {
 function applySettings() {
   const s = JSON.parse(localStorage.getItem('pm_settings') || '{}')
   loadSettings()
+}
+window.resetSettings = () => {
+  if (confirm('Clear all saved settings?')) {
+    localStorage.removeItem('pm_settings')
+    document.getElementById('s-envpath').value = ''
+    document.getElementById('s-poolname').value = ''
+    document.getElementById('s-decryptscript').value = ''
+    document.getElementById('s-encryptscript').value = ''
+    document.getElementById('s-network').value = 'mainnet'
+    document.getElementById('settings-terminal').textContent = 'Settings cleared.'
+    ;['d-cnodehome','d-poolname','d-poolid','d-ticker','d-nodeport','d-promport','d-library','d-opcert','d-nodeversion'].forEach(id => {
+      document.getElementById(id).textContent = '—'
+    })
+  }
 }
 // ── KEY STATUS ──
 document.getElementById('key-status')?.addEventListener('click', () => showPanel('security'))
