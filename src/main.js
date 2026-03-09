@@ -14,11 +14,16 @@ document.querySelector('#app').innerHTML = `
       <h1>Pool<span style="color:var(--accent)">Manager</span></h1>
       <p>Cardano Stake Pool GUI &mdash; by GNP1</p>
     </div>
-
+    <div class="form-group">
+      <label>Saved Profiles</label>
+      <select id="c-profile">
+        <option value="">-- Select saved profile --</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group">
         <label>Hostname / IP</label>
-        <input id="c-host" type="text" placeholder="192.168.0.62" />
+        <input id="c-host" type="text" placeholder="hostname or IP" />
       </div>
       <div class="form-group port">
         <label>Port</label>
@@ -28,7 +33,7 @@ document.querySelector('#app').innerHTML = `
 
     <div class="form-group">
       <label>Username</label>
-      <input id="c-user" type="text" placeholder="russell" />
+      <input id="c-user" type="text" placeholder="username" />
     </div>
 
     <div class="form-group">
@@ -323,7 +328,9 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
       document.getElementById('connect-screen').style.display = 'none'
       document.getElementById('main-app').classList.add('show')
       document.getElementById('conn-label').textContent = username + '@' + host
+      saveProfile(host, port, username, order)
       loadDashboard()
+      startAutoRefresh()
     } else {
       errEl.textContent = result.error || 'Connection failed'
       errEl.classList.add('show')
@@ -342,6 +349,7 @@ document.getElementById('btn-disconnect').addEventListener('click', async () => 
   await invoke('ssh_disconnect')
   connected = false
   document.getElementById('main-app').classList.remove('show')
+  stopAutoRefresh()
   document.getElementById('connect-screen').style.display = 'flex'
 })
 
@@ -384,6 +392,25 @@ async function loadDashboard() {
   } catch(e) {
     term.textContent = 'Could not load node info: ' + String(e)
   }
+// Load KES info
+  try {
+    const kes = await invoke('ssh_run', {
+      command: 'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query kes-period-info --mainnet --op-cert-file /opt/cardano/cnode_bp/priv/pool/GNP1/op.cert 2>/dev/null'
+    })
+    if (kes.success && kes.output) {
+      const match = kes.output.match(/"qKesKesKeyExpiry":\s*"([^"]+)"/)
+      if (match) {
+        const expiry = new Date(match[1])
+        const daysLeft = Math.floor((expiry - new Date()) / (1000 * 60 * 60 * 24))
+        document.getElementById('stat-kes').textContent = daysLeft + ' days'
+        document.getElementById('stat-kes').className = 'card-value ' + (daysLeft < 7 ? 'danger' : daysLeft < 30 ? 'warning' : 'success')
+        const periodMatch = kes.output.match(/"qKesEndKesInterval":\s*(\d+)/)
+	const currentMatch = kes.output.match(/"qKesCurrentKesPeriod":\s*(\d+)/)
+	const periodsLeft = periodMatch && currentMatch ? parseInt(periodMatch[1]) - parseInt(currentMatch[1]) : null
+	document.getElementById('stat-kes-sub').textContent = 'Expires ' + expiry.toLocaleDateString('en-GB') + (periodsLeft !== null ? ' (' + periodsLeft + ' periods)' : '')
+      }
+    }
+  } catch(e) {}    
 }
 
 // ── POOL ──
@@ -400,10 +427,9 @@ window.confirmRetire = () => {
 
 // ── KES ──
 window.checkKES = () => run(
-  'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query kes-period-info --mainnet 2>/dev/null || echo "Check KES manually with your pool cert path"',
+  'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query kes-period-info --mainnet --op-cert-file /opt/cardano/cnode_bp/priv/pool/GNP1/op.cert 2>/dev/null',
   'kes-terminal'
 )
-
 window.confirmRotateKES = () => {
   if (confirm('Rotate KES keys? This will update your operational certificate.')) {
     run('source /opt/cardano/cnode_bp/scripts/env && source /opt/cardano/cnode_bp/scripts/cntools.library && rotatePoolKeys', 'kes-terminal')
@@ -492,6 +518,73 @@ document.addEventListener('keydown', e => {
     window.runCustomCommand()
   }
 })
+// ── SAVED PROFILES ──
+function saveProfile(host, port, username, order) {
+  const profiles = JSON.parse(localStorage.getItem('pm_profiles') || '[]')
+  const existing = profiles.findIndex(p => p.host === host && p.username === username)
+  const profile = { host, port, username, order, label: username + '@' + host }
+  if (existing >= 0) {
+    profiles[existing] = profile
+  } else {
+    profiles.push(profile)
+  }
+  localStorage.setItem('pm_profiles', JSON.stringify(profiles))
+  loadProfileDropdown()
+}
 
+function loadProfileDropdown() {
+  const select = document.getElementById('c-profile')
+  const profiles = JSON.parse(localStorage.getItem('pm_profiles') || '[]')
+  select.innerHTML = '<option value="">-- Select saved profile --</option>'
+  profiles.forEach((p, i) => {
+    const opt = document.createElement('option')
+    opt.value = i
+    opt.textContent = p.label
+    select.appendChild(opt)
+  })
+}
+
+document.getElementById('c-profile').addEventListener('change', function() {
+  const profiles = JSON.parse(localStorage.getItem('pm_profiles') || '[]')
+  const p = profiles[this.value]
+  if (p) {
+    document.getElementById('c-host').value = p.host
+    document.getElementById('c-port').value = p.port
+    document.getElementById('c-user').value = p.username
+    document.getElementById('c-order').value = p.order
+    document.getElementById('totp-group').style.display = p.order === 'password_only' ? 'none' : 'block'
+  }
+})
+
+loadProfileDropdown()
+
+// ── AUTO REFRESH ──
+let refreshInterval = null
+
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval)
+  refreshInterval = setInterval(async () => {
+    try {
+      const r = await invoke('ssh_run', {
+        command: 'source /opt/cardano/cnode_bp/scripts/env && cardano-cli query tip --mainnet 2>/dev/null'
+      })
+      if (r.success && r.output) {
+        const tip = JSON.parse(r.output)
+        const sync = parseFloat(tip.syncProgress) || 0
+        document.getElementById('stat-sync').textContent = sync + '%'
+        document.getElementById('stat-sync').className = 'card-value ' + (sync > 99 ? 'success' : 'warning')
+        document.getElementById('stat-sync-sub').textContent = 'Slot ' + (tip.slot || '?')
+        document.getElementById('stat-epoch').textContent = tip.epoch || '?'
+        document.getElementById('stat-epoch-sub').textContent = 'Block ' + (tip.block || '?')
+        document.getElementById('dashboard-terminal').textContent = r.output
+      }
+    } catch(e) {}
+  }, 30000)
+}
+
+function stopAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval)
+  refreshInterval = null
+}
 // ── KEY STATUS ──
 document.getElementById('key-status')?.addEventListener('click', () => showPanel('security'))
