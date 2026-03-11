@@ -1,7 +1,7 @@
 # PoolManager — Development Documentation
 
 > This is a living document. It is updated as the project evolves.
-> Last updated: March 2026
+> Last updated: March 2026 (Session 2)
 
 ---
 
@@ -13,7 +13,7 @@
 4. [Project Structure](#4-project-structure)
 5. [SSH Connection Layer](#5-ssh-connection-layer)
 6. [Settings System](#6-settings-system)
-7. [Node Metrics](#7-node-metrics)
+7. [Node Resources & Metrics](#7-node-resources--metrics)
 8. [cntools.library Integration](#8-cntoolslibrary-integration)
 9. [Node Version Compatibility](#9-node-version-compatibility)
 10. [Node Upgrades and Hard Forks](#10-node-upgrades-and-hard-forks)
@@ -21,8 +21,9 @@
 12. [Current Status](#12-current-status)
 13. [Roadmap](#13-roadmap)
 14. [Known Issues and Limitations](#14-known-issues-and-limitations)
-15. [Contributing](#15-contributing)
-16. [Security Model](#16-security-model)
+15. [Session History](#15-session-history)
+16. [Contributing](#16-contributing)
+17. [Security Model](#17-security-model)
 
 ---
 
@@ -428,9 +429,24 @@ cargo tauri dev
 - [x] SSH connection with Google Authenticator 2FA support
 - [x] Configurable authentication order per node (TOTP first or password first)
 - [x] Saved node connection profiles (host, port, username, auth order)
-- [x] Dashboard — live node sync, epoch, slot, block height
-- [x] Dashboard — KES expiry in days and periods remaining
-- [x] Dashboard — auto-refresh every 30 seconds
+- [x] Setup wizard (5 steps: Welcome → SSH → Node config → Key scripts → Done)
+- [x] Settings panel with auto-detect from env file
+- [x] Dashboard — SVG speedometer gauges for Node Sync % and Epoch Progress %
+- [x] Dashboard — KES fuel tank (vertical, colour-coded green/amber/red)
+- [x] Dashboard — 12 quick-stat cards (slot, block, epoch, slot-in-epoch, next epoch countdown, era, version, pool, mempool TX, mempool KB, memory GB, density)
+- [x] Dashboard — Node Resources row: CPU %, Node Mem RSS GB, Sys Mem %, Disk %, Peers In, Peers Out
+- [x] Dashboard — Peers In/Out via `ss` (same method as gLiveView, not Prometheus)
+- [x] Dashboard — Pool & Delegation section via Koios API (live stake, active stake, delegators, saturation, blocks lifetime, pledge, margin, fee)
+- [x] Dashboard — Block Activity section: Leader, Ideal, Luck, Adopted, Confirmed, Lost
+- [x] Dashboard — Dual countdown timers: Next Assigned Slot (with SVG countdown ring) and Time Since Last Chain Block
+- [x] Dashboard — auto-refresh every 30s; KES + Koios every ~5 min; cncli every 30s; local 1s tick
+- [x] cncli integration — leader schedule and confirmed blocks from sqlite3 DB
+- [x] Block Activity: Lost stat is epoch-only orphaned blocks from cncli chain table (not Prometheus session counter)
+- [x] Block Activity: Adopted is epoch-only from cncli (not Prometheus)
+- [x] Block Activity: Ideal uses sigma-based calculation (live_stake / totalActiveStake × 21600)
+- [x] Block Activity: friendly `--` UI with explanatory message when cncli not installed
+- [x] Countdowns show `Xd HH:MM:SS` format
+- [x] bech32 pool ID conversion in pure JS (no external tools needed)
 - [x] KES panel — check KES expiry with full detail
 - [x] KES panel — rotate KES keys (calls cntools.library rotatePoolKeys)
 - [x] Sidebar navigation to all panels
@@ -440,22 +456,17 @@ cargo tauri dev
 
 ### Panels present but not fully wired
 
-- [ ] Pool Info — needs proper pool data queries
-- [ ] Blocks — needs cncli integration
+- [ ] Pool Info — currently shows raw `query tip` output; needs formatted Koios summary
+- [ ] Blocks — needs cncli leader schedule as a proper table (slot, time, status)
 - [ ] Wallets — needs wallet listing and balance display
 - [ ] Send ADA — UI present, full flow not implemented
 - [ ] Rewards — UI present, full flow not implemented
 - [ ] Governance — DRep status partial, voting not implemented
 - [ ] Assets — UI present, not wired
-- [ ] Security — decrypt/encrypt paths need configuring per user
 
 ### Not yet built
 
-- [ ] Settings panel — env file path, pool name, auto-detection
-- [ ] Rich dashboard — Prometheus metrics, gLiveView-equivalent graphics
-- [ ] Epoch progress bar and visual indicators
-- [ ] Pool saturation, live stake, delegator count (via Koios)
-- [ ] Peer map
+- [ ] Peers panel — dedicated sidebar panel with inbound/outbound peer tables and RTT latency (via `ss -ni`)
 - [ ] Node restart/stop/start from UI
 - [ ] Windows build via GitHub Actions
 - [ ] Mac build
@@ -469,10 +480,14 @@ cargo tauri dev
 ### Phase 1 — Foundation (current)
 - [x] Tauri app scaffold
 - [x] SSH with 2FA
+- [x] Setup wizard
+- [x] Settings panel with auto-detection from env file
 - [x] Basic dashboard
 - [x] KES management
-- [ ] Settings panel with auto-detection from env file
-- [ ] Rich dashboard using Prometheus metrics
+- [x] Rich dashboard using Prometheus metrics + cncli + Koios + ss
+- [ ] Peers panel with RTT latency
+- [ ] Pool Info panel — formatted Koios data
+- [ ] Blocks panel — cncli leader schedule table
 
 ### Phase 2 — Core operations
 - [ ] Full wallet management
@@ -492,7 +507,6 @@ cargo tauri dev
 - [ ] Windows installer (.msi) via GitHub Actions
 - [ ] Mac build (.dmg)
 - [ ] Auto-update mechanism
-- [ ] Onboarding wizard for first-time users
 - [ ] Full error handling and user-friendly error messages
 - [ ] Security audit
 
@@ -509,17 +523,35 @@ cargo tauri dev
 
 | Issue | Impact | Notes |
 |-------|--------|-------|
-| Paths hardcoded to GNP1 setup | All users | Settings panel will fix this |
-| Pool name hardcoded as GNP1 | All users | Settings panel will fix this |
 | No streaming output | Medium | Long operations show no progress until complete |
 | localStorage for profiles | Low | Cleared if user clears browser data |
 | No session timeout handling | Medium | SSH session may drop without clear error |
 | Single node connection | Low | Cannot manage multiple nodes simultaneously |
-| Prometheus port not auto-detected yet | Low | Hardcoded to 12799, Settings will fix |
+| Confirmed vs Adopted identical | Low | Both show cncli non-orphaned count; true depth-based confirmed TBD |
+| KES panel uses old cardano-cli syntax | Low | Missing `latest` keyword — fix pending |
+| Peers panel not yet built | Medium | In/Out counts on dashboard; full peer list with RTT coming next |
+| Pool Info panel shows raw query tip | Low | Koios data fetched but panel not yet formatted |
+| Blocks panel not yet built | Medium | Leader schedule table coming next |
 
 ---
 
-## 15. Contributing
+## 15. Session History
+
+### Session 1 (March 2026)
+Initial build. SSH connection, setup wizard, basic dashboard scaffold, KES panel, all sidebar panels created, bech32 pure JS implementation, Koios integration via SSH curl, cncli sqlite3 integration, SVG speedometer gauges, KES fuel tank, Prometheus metrics parsing, Block Activity section, dual countdown timers.
+
+### Session 2 (March 2026)
+- **Block Activity fixes**: Lost stat changed from Prometheus session counter to epoch-only orphaned blocks via cncli `chain` table (`orphaned=1`). Adopted changed from Prometheus to epoch-only cncli count. Ideal calculation corrected to sigma-based (`live_stake / totalActiveStake × 21600`) with Koios `epoch_info` fallback. Countdowns changed to `Xd HH:MM:SS` format.
+- **Friendly cncli fallback**: When cncli is not installed all Block Activity stats show `--` with explanatory message rather than silently failing.
+- **Node Resources row**: Added CPU %, Node Mem RSS GB (matching gLiveView `ps -q PID -o rss=`), Sys Mem %, Disk % (using `cnodehome` path from settings). Section renamed from Node Metrics to Node Resources.
+- **Peers In/Out**: Moved from Prometheus `peersFromNodeKernel_int` (single undifferentiated count) to `ss` socket inspection — same method as gLiveView. PID obtained from `ss -tnlp` listening socket (reliable over non-interactive SSH; `pgrep` was matching the SSH command itself). Peers In = connections to node port; Peers Out = all other established connections excluding Prometheus port.
+- **Quick stats expanded**: Mempool TX, Mempool KB, Memory GB, Density moved from Node Metrics row into the quick-stats grid (now 12 cards).
+- **Next Assigned Slot ring**: SVG countdown arc replaces plain timer. Drains clockwise, turns amber under 30 minutes, turns red and pulses under 30 seconds. Time text reduced to fit `Xd HH:MM:SS` on one line.
+- **Hardcoded values removed**: `/home/russell/.local/bin/cncli` → `~/.local/bin/cncli`; nodeport default changed from `12798` to `6000` (Guild standard).
+
+---
+
+## 16. Contributing
 
 Contributions are welcome. Please:
 
@@ -546,7 +578,7 @@ Contributions are welcome. Please:
 
 ---
 
-## 16. Security Model
+## 17. Security Model
 
 ### What PoolManager does
 
