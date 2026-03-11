@@ -310,21 +310,24 @@ document.querySelector('#app').innerHTML = `
               <div class="qs-item"><span class="qs-label">Era</span><span class="qs-val" id="qs-era">--</span></div>
               <div class="qs-item"><span class="qs-label">Node Version</span><span class="qs-val" id="qs-version">--</span></div>
               <div class="qs-item"><span class="qs-label">Pool</span><span class="qs-val success" id="qs-pool">--</span></div>
+              <div class="qs-item"><span class="qs-label">Mempool TX</span><span class="qs-val mono" id="mc-mempool-tx">--</span></div>
+              <div class="qs-item"><span class="qs-label">Mempool KB</span><span class="qs-val mono" id="mc-mempool-kb">--</span></div>
+              <div class="qs-item"><span class="qs-label">Memory GB</span><span class="qs-val mono" id="mc-memory">--</span></div>
+              <div class="qs-item"><span class="qs-label">Density</span><span class="qs-val mono" id="mc-density">--%</span></div>
             </div>
           </div>
         </div>
 
         <!-- NODE METRICS -->
         <div class="section">
-          <div class="section-title">Node Metrics</div>
+          <div class="section-title">Node Resources</div>
           <div class="metrics-row">
+            <div class="metric-card"><div class="mc-label">CPU %</div><div class="mc-value" id="mc-cpu">--%</div></div>
+            <div class="metric-card"><div class="mc-label">Node Mem</div><div class="mc-value" id="mc-mem-rss">--G</div></div>
+            <div class="metric-card"><div class="mc-label">Sys Mem %</div><div class="mc-value" id="mc-mem-pct">--%</div></div>
+            <div class="metric-card"><div class="mc-label">Disk %</div><div class="mc-value" id="mc-disk">--%</div></div>
             <div class="metric-card"><div class="mc-label">Peers In</div><div class="mc-value" id="mc-peers-in">--</div></div>
             <div class="metric-card"><div class="mc-label">Peers Out</div><div class="mc-value" id="mc-peers-out">--</div></div>
-            <div class="metric-card"><div class="mc-label">Mempool TX</div><div class="mc-value" id="mc-mempool-tx">--</div></div>
-            <div class="metric-card"><div class="mc-label">Mempool KB</div><div class="mc-value" id="mc-mempool-kb">--</div></div>
-            <div class="metric-card"><div class="mc-label">Memory GB</div><div class="mc-value" id="mc-memory">--</div></div>
-            <div class="metric-card"><div class="mc-label">Density</div><div class="mc-value" id="mc-density">--%</div></div>
-
           </div>
         </div>
 
@@ -369,8 +372,14 @@ document.querySelector('#app').innerHTML = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div class="block-timer-wrap">
                 <div class="bt-label">Next Assigned Slot In</div>
-                <div class="bt-time" id="bt-next-slot" style="font-size:28px;letter-spacing:2px">--:--:--</div>
-                <div class="bt-sub" id="bt-next-slot-abs">--</div>
+                <svg viewBox="0 0 100 100" width="100" height="100" id="slot-ring-svg" style="display:block;margin:6px auto">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#1a1e2e" stroke-width="6"/>
+                  <circle id="slot-ring-arc" cx="50" cy="50" r="42" fill="none" stroke="#2d3148"
+                    stroke-width="6" stroke-dasharray="0 264" stroke-dashoffset="0"
+                    transform="rotate(-90 50 50)" stroke-linecap="round"/>
+                </svg>
+                <div class="bt-time" id="bt-next-slot" style="font-size:17px;letter-spacing:1px;margin-top:2px">--:--:--</div>
+                <div class="bt-sub" id="bt-next-slot-abs" style="font-size:10px">--</div>
               </div>
               <div class="block-timer-wrap">
                 <div class="bt-label">Time Since Last Chain Block</div>
@@ -677,29 +686,14 @@ function updateTipData(tipJson) {
 function updatePrometheusData(promText) {
   const m = parsePrometheus(promText)
 
-  const peersIn   = m['cardano_node_metrics_incomingConns_int'] ?? m['cardano_node_metrics_peersFromNodeKernel_int']
-  const peersOut  = m['cardano_node_metrics_outgoingConns_int']
   const mempTx    = m['cardano_node_metrics_txsInMempool_int']
   const mempBytes = m['cardano_node_metrics_mempoolBytes_int']
   const memory    = m['cardano_node_metrics_RTS_gcLiveBytes_int']
   const density   = m['cardano_node_metrics_density_real']
-  const forged    = m['cardano_node_metrics_blocksForged_int'] ?? m['cardano_node_metrics_Forge_forged_counter']
-  const adopted   = m['cardano_node_metrics_Forge_adopted_counter']
-
-  if (peersIn   != null) setText('mc-peers-in',   Math.round(peersIn).toString())
-  if (peersOut  != null) setText('mc-peers-out',  Math.round(peersOut).toString())
   if (mempTx    != null) setText('mc-mempool-tx', Math.round(mempTx).toString())
   if (mempBytes != null) setText('mc-mempool-kb', (mempBytes / 1024).toFixed(1))
   if (memory    != null) setText('mc-memory',     (memory / 1024 / 1024 / 1024).toFixed(2))
   if (density   != null) setText('mc-density',    (density * 100).toFixed(2) + '%')
-  if (adopted != null) {
-    const adoptedVal = Math.round(adopted)
-    if (forged != null) {
-      const lost   = Math.max(0, Math.round(forged) - adoptedVal)
-      const lostEl = document.getElementById('bsc-lost')
-      if (lostEl) { lostEl.textContent = lost.toString(); lostEl.className = 'bsc-val' + (lost > 0 ? ' danger' : '') }
-    }
-  }
 
   const vMatch = promText.match(/cardano_node_metrics_cardano_build_info[^}]*,version="([^"]+)"/)
   if (vMatch) setText('qs-version', vMatch[1])
@@ -783,12 +777,23 @@ async function fetchCncliData() {
   const badge    = document.getElementById('cncli-badge')
   const missing  = document.getElementById('cncli-missing')
 
-  const cncliCheck = await invoke('ssh_run', { command: 'which cncli 2>/dev/null || ls /home/russell/.local/bin/cncli 2>/dev/null || ls /usr/local/bin/cncli 2>/dev/null || ls ~/.cargo/bin/cncli 2>/dev/null || echo MISSING' })
+  const cncliCheck = await invoke('ssh_run', { command: 'which cncli 2>/dev/null || ls ~/.local/bin/cncli 2>/dev/null || ls /usr/local/bin/cncli 2>/dev/null || ls ~/.cargo/bin/cncli 2>/dev/null || echo MISSING' })
   const cncliPath  = (cncliCheck.output || '').trim().split('\n')[0]
   const hasCncli   = !!cncliPath && !cncliPath.includes('MISSING')
   if (badge)   badge.style.display   = hasCncli ? 'inline' : 'none'
   if (missing) missing.style.display = hasCncli ? 'none'   : 'inline'
-  if (!hasCncli) return
+  if (!hasCncli) {
+    // cncli not installed — show '--' for all Block Activity stats gracefully
+    ;['bsc-leader','bsc-ideal','bsc-luck','bsc-adopted','bsc-confirmed','bsc-lost'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) { el.textContent = '--'; el.className = 'bsc-val' }
+    })
+    setText('bt-next-slot',     '--:--:--')
+    setText('bt-next-slot-abs', 'cncli not installed — leader schedule unavailable')
+    const ringArcNC = document.getElementById('slot-ring-arc')
+    if (ringArcNC) { ringArcNC.setAttribute('stroke-dasharray', '0 264'); ringArcNC.setAttribute('stroke', '#2d3148') }
+    return
+  }
 
   try {
     const tipR        = await invoke('ssh_run', { command: `source ${home}/scripts/env && cardano-cli latest query tip --mainnet 2>/dev/null` })
@@ -838,19 +843,35 @@ async function fetchCncliData() {
       // bsc-adopted = epoch-only adopted (non-orphaned blocks in our assigned slots this epoch)
       const adoptedEl = document.getElementById('bsc-adopted')
       if (adoptedEl) { adoptedEl.textContent = confirmed.toString(); adoptedEl.className = 'bsc-val' + (confirmed > 0 ? ' success' : '') }
+
+      // Lost (orphaned blocks in our assigned slot range this epoch)
+      const lostR = await invoke('ssh_run', {
+        command: `sqlite3 ${db} "SELECT count(*) FROM chain WHERE pool_id='${poolIdHex}' AND orphaned=1 AND slot_number>=${slotMin} AND slot_number<=${slotMax};" 2>/dev/null`
+      })
+      const lost   = parseInt((lostR.output || '0').trim()) || 0
+      const lostEl = document.getElementById('bsc-lost')
+      if (lostEl) { lostEl.textContent = lost.toString(); lostEl.className = 'bsc-val' + (lost > 0 ? ' danger' : '') }
     } else {
       setText('bsc-confirmed', '0')
-      setText('bsc-adopted', '0')
+      setText('bsc-adopted',   '0')
+      setText('bsc-lost',      '0')
     }
 
     // Next slot countdown
     const futureSlots = slotList.filter(sl => sl > currentSlot).sort((a, b) => a - b)
     if (futureSlots.length > 0) {
+      // Store original distance only when the target slot changes
+      if (window._nextSlotAbs !== futureSlots[0]) {
+        window._nextSlotOriginalDistance = futureSlots[0] - currentSlot
+      }
       window._nextSlotSlotsAway = futureSlots[0] - currentSlot
       window._nextSlotAbs       = futureSlots[0]
       setText('bt-next-slot-abs', 'Slot ' + futureSlots[0].toLocaleString() + ' (' + futureSlots.length + ' remaining)')
     } else {
       window._nextSlotSlotsAway = null
+      window._nextSlotOriginalDistance = null
+      const ringArc = document.getElementById('slot-ring-arc')
+      if (ringArc) { ringArc.setAttribute('stroke-dasharray', '0 264'); ringArc.setAttribute('stroke', '#2d3148') }
       setText('bt-next-slot',     'No slots')
       setText('bt-next-slot-abs', leaderCount > 0 ? 'All slots passed this epoch' : 'No slots this epoch')
     }
@@ -910,6 +931,18 @@ function startLocalTick() {
       setText('bt-next-slot', formatCountdown(ns))
       const nsEl = document.getElementById('bt-next-slot')
       if (nsEl) nsEl.style.color = ns < 30 ? 'var(--warning)' : 'var(--success)'
+
+      // Update countdown ring
+      const ringArc = document.getElementById('slot-ring-arc')
+      if (ringArc && window._nextSlotOriginalDistance > 0) {
+        const pct   = Math.max(0, ns / window._nextSlotOriginalDistance)
+        const circ  = 264
+        ringArc.setAttribute('stroke-dasharray', `${(pct * circ).toFixed(1)} ${circ}`)
+        const color = ns < 30 ? '#ff4d4d' : ns < 1800 ? '#ffb800' : '#00c48c'
+        ringArc.setAttribute('stroke', color)
+        if (ns < 30) ringArc.classList.add('slot-pulse')
+        else         ringArc.classList.remove('slot-pulse')
+      }
     } else if (window._nextSlotSlotsAway === 0) {
       setText('bt-next-slot', '00:00:00')
     }
@@ -918,6 +951,69 @@ function startLocalTick() {
 }
 
 function stopLocalTick() { if (localTickInterval) clearInterval(localTickInterval); localTickInterval = null }
+
+// ── RESOURCES DATA (CPU, Memory, Disk — matching gLiveView methodology) ──
+async function fetchResourcesData() {
+  const s        = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  const home     = s.cnodehome || '/opt/cardano/cnode'
+  const nodePort = s.nodeport  || '6000'
+  try {
+    const r = await invoke('ssh_run', {
+      command:
+        `CPU=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print $2}' | cut -d% -f1); ` +
+        // Node RSS from ps (matches gLiveView Mem RSS)
+        `BPID=$(ss -tnlp 2>/dev/null | grep ":${nodePort} " | grep -o "pid=[0-9]*" | grep -o "[0-9]*" | head -1); ` +
+        `RSS=$(ps -q $BPID -o rss= 2>/dev/null | awk '{printf "%.1f", $1/1048576}'); ` +
+        // System memory %
+        `MEM=$(free -m 2>/dev/null | awk 'NR==2{printf "%.1f", $3/$2*100}'); ` +
+        // Disk % for cnode home partition
+        `DISK=$(df "${home}" 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%'); ` +
+        `echo "$CPU $RSS $MEM $DISK"`
+    })
+    const parts = (r.output || '').trim().split(' ')
+    const cpu  = parseFloat(parts[0])
+    const rss  = parseFloat(parts[1])
+    const mem  = parseFloat(parts[2])
+    const disk = parseFloat(parts[3])
+
+    const cpuEl  = document.getElementById('mc-cpu')
+    const rssEl  = document.getElementById('mc-mem-rss')
+    const memEl  = document.getElementById('mc-mem-pct')
+    const diskEl = document.getElementById('mc-disk')
+
+    if (!isNaN(cpu)  && cpuEl)  { cpuEl.textContent  = cpu.toFixed(1) + '%';  cpuEl.className  = 'mc-value' + (cpu  > 90 ? ' danger' : cpu  > 70 ? ' warning' : '') }
+    if (!isNaN(rss)  && rssEl)  { rssEl.textContent  = rss.toFixed(1) + 'G';  rssEl.className  = 'mc-value' }
+    if (!isNaN(mem)  && memEl)  { memEl.textContent  = mem.toFixed(1) + '%';  memEl.className  = 'mc-value' + (mem  > 90 ? ' danger' : mem  > 70 ? ' warning' : '') }
+    if (!isNaN(disk) && diskEl) { diskEl.textContent = disk.toFixed(0) + '%'; diskEl.className = 'mc-value' + (disk > 90 ? ' danger' : disk > 70 ? ' warning' : '') }
+
+    // Also update Prometheus Memory GB card with RSS if Prometheus hasn't populated it
+    if (!isNaN(rss)) {
+      const promMemEl = document.getElementById('mc-memory')
+      if (promMemEl && promMemEl.textContent === '--') setText('mc-memory', rss.toFixed(2))
+    }
+  } catch(e) {}
+}
+
+// ── PEERS DATA (via ss, same method as gLiveView) ──
+async function fetchPeersData() {
+  const s        = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+  const nodePort = s.nodeport || '6000'
+  const promPort = s.promport || '12799'
+  try {
+    const r = await invoke('ssh_run', {
+      command:
+        `BPID=$(ss -tnlp 2>/dev/null | grep ":${nodePort} " | grep -o "pid=[0-9]*" | grep -o "[0-9]*" | head -1); ` +
+        `PIN=$(ss -tnp state established 2>/dev/null | grep "pid=$BPID," | grep ":${nodePort} " | wc -l); ` +
+        `POUT=$(ss -tnp state established 2>/dev/null | grep "pid=$BPID," | grep -v ":${nodePort} \|:${promPort} " | wc -l); ` +
+        `echo "$PIN $POUT"`
+    })
+    const parts = (r.output || '').trim().split(' ')
+    const pIn   = parseInt(parts[0])
+    const pOut  = parseInt(parts[1])
+    if (!isNaN(pIn))  setText('mc-peers-in',  pIn.toString())
+    if (!isNaN(pOut)) setText('mc-peers-out', pOut.toString())
+  } catch(e) {}
+}
 
 // ── DASHBOARD LOAD ──
 async function loadDashboard() {
@@ -940,6 +1036,8 @@ async function loadDashboard() {
   kesFetchCounter = (kesFetchCounter + 1) % 10
 
   fetchCncliData()
+  fetchPeersData()
+  fetchResourcesData()
 }
 
 // ── AUTO REFRESH ──
