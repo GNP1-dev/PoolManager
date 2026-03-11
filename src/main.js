@@ -9,6 +9,7 @@ let epochSlotsLeft = null
 let localTickInterval = null
 let refreshInterval   = null
 let kesFetchCounter   = 0
+let currentEpoch      = 0
 
 // ── SETTINGS HELPER ──
 function cfg() {
@@ -323,8 +324,7 @@ document.querySelector('#app').innerHTML = `
             <div class="metric-card"><div class="mc-label">Mempool KB</div><div class="mc-value" id="mc-mempool-kb">--</div></div>
             <div class="metric-card"><div class="mc-label">Memory GB</div><div class="mc-value" id="mc-memory">--</div></div>
             <div class="metric-card"><div class="mc-label">Density</div><div class="mc-value" id="mc-density">--%</div></div>
-            <div class="metric-card"><div class="mc-label">Forged</div><div class="mc-value success" id="mc-forged">--</div></div>
-            <div class="metric-card"><div class="mc-label">Adopted</div><div class="mc-value success" id="mc-adopted">--</div></div>
+
           </div>
         </div>
 
@@ -558,6 +558,15 @@ function formatElapsed(seconds) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }
 
+function formatCountdown(seconds) {
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  if (d > 0) return d + 'd ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0')
+}
+
 async function run(command, terminalId) {
   const term = document.getElementById(terminalId)
   if (term) term.textContent = 'Running...'
@@ -637,6 +646,7 @@ function updateTipData(tipJson) {
     const slot        = tip.slot  || 0
     const block       = tip.block || 0
     const epoch       = tip.epoch || 0
+    currentEpoch      = epoch
     const slotInEpoch = tip.slotInEpoch     != null ? tip.slotInEpoch     : (slot % 432000)
     const slotsToEnd  = tip.slotsToEpochEnd != null ? tip.slotsToEpochEnd : (432000 - slotInEpoch)
 
@@ -682,12 +692,8 @@ function updatePrometheusData(promText) {
   if (mempBytes != null) setText('mc-mempool-kb', (mempBytes / 1024).toFixed(1))
   if (memory    != null) setText('mc-memory',     (memory / 1024 / 1024 / 1024).toFixed(2))
   if (density   != null) setText('mc-density',    (density * 100).toFixed(2) + '%')
-  if (forged    != null) setText('mc-forged',     Math.round(forged).toString())
-
   if (adopted != null) {
     const adoptedVal = Math.round(adopted)
-    setText('mc-adopted',  adoptedVal.toString())
-    setText('bsc-adopted', adoptedVal.toString())
     if (forged != null) {
       const lost   = Math.max(0, Math.round(forged) - adoptedVal)
       const lostEl = document.getElementById('bsc-lost')
@@ -729,11 +735,28 @@ async function fetchKoiosData() {
     const sat = p.live_saturation != null ? parseFloat(p.live_saturation).toFixed(2) + '%' : '--'
     setText('ps-saturation', sat)
 
-    // Store for cncli ideal calc
-    if (p.live_saturation != null) {
-      const stored = JSON.parse(localStorage.getItem('pm_settings') || '{}')
-      stored.liveSaturation = parseFloat(p.live_saturation)
-      localStorage.setItem('pm_settings', JSON.stringify(stored))
+    // Store live_stake + saturation for cncli ideal calc
+    const toStore = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+    if (p.live_saturation != null) toStore.liveSaturation = parseFloat(p.live_saturation)
+    if (p.live_stake)      toStore.liveStakeLovelace     = p.live_stake
+    localStorage.setItem('pm_settings', JSON.stringify(toStore))
+
+    // Fetch total active stake for current epoch (needed for accurate ideal blocks)
+    if (currentEpoch > 0) {
+      try {
+        const epochR = await invoke('ssh_run', {
+          command: `curl -s "https://api.koios.rest/api/v1/epoch_info?_epoch_no=${currentEpoch}"`
+        })
+        const epochRaw = (epochR.output || '').trim()
+        if (epochRaw.startsWith('[')) {
+          const epochData = JSON.parse(epochRaw)
+          if (epochData[0] && epochData[0].active_stake) {
+            const toStore2 = JSON.parse(localStorage.getItem('pm_settings') || '{}')
+            toStore2.totalActiveStakeLovelace = epochData[0].active_stake
+            localStorage.setItem('pm_settings', JSON.stringify(toStore2))
+          }
+        }
+      } catch(e) {}
     }
 
     setText('ps-blocks', (p.block_count ?? '--').toString())
@@ -784,15 +807,22 @@ async function fetchCncliData() {
     }
     setText('bsc-leader', leaderCount.toString())
 
-    // Ideal + Luck
+    // Ideal + Luck — use live_stake/totalActiveStake for accurate sigma
     const freshS = JSON.parse(localStorage.getItem('pm_settings') || '{}')
-    if (freshS.liveSaturation != null) {
-      const ideal  = (freshS.liveSaturation / 100) * 21600
+    let ideal = null
+    if (freshS.liveStakeLovelace && freshS.totalActiveStakeLovelace) {
+      const sigma = parseInt(freshS.liveStakeLovelace) / parseInt(freshS.totalActiveStakeLovelace)
+      ideal = sigma * 21600
+    } else if (freshS.liveSaturation != null) {
+      // Fallback: approximate via saturation / nOpt (less accurate but works without epoch_info)
+      ideal = (freshS.liveSaturation / 100 / 500) * 21600
+    }
+    if (ideal != null) {
       setText('bsc-ideal', ideal.toFixed(2))
       if (leaderCount > 0 && ideal > 0) {
-        const luck   = Math.round((leaderCount / ideal) * 100)
+        const luck   = (leaderCount / ideal * 100).toFixed(2)
         const luckEl = document.getElementById('bsc-luck')
-        if (luckEl) { luckEl.textContent = luck + '%'; luckEl.className = 'bsc-val' + (luck >= 100 ? ' success' : luck >= 75 ? '' : ' warning') }
+        if (luckEl) { luckEl.textContent = luck + '%'; luckEl.className = 'bsc-val' + (parseFloat(luck) >= 100 ? ' success' : parseFloat(luck) >= 75 ? '' : ' warning') }
       } else { setText('bsc-luck', '0%') }
     }
 
@@ -805,7 +835,13 @@ async function fetchCncliData() {
       const confirmed = parseInt((confR.output || '0').trim()) || 0
       const confEl    = document.getElementById('bsc-confirmed')
       if (confEl) { confEl.textContent = confirmed.toString(); confEl.className = 'bsc-val' + (confirmed > 0 ? ' success' : '') }
-    } else { setText('bsc-confirmed', '0') }
+      // bsc-adopted = epoch-only adopted (non-orphaned blocks in our assigned slots this epoch)
+      const adoptedEl = document.getElementById('bsc-adopted')
+      if (adoptedEl) { adoptedEl.textContent = confirmed.toString(); adoptedEl.className = 'bsc-val' + (confirmed > 0 ? ' success' : '') }
+    } else {
+      setText('bsc-confirmed', '0')
+      setText('bsc-adopted', '0')
+    }
 
     // Next slot countdown
     const futureSlots = slotList.filter(sl => sl > currentSlot).sort((a, b) => a - b)
@@ -854,8 +890,7 @@ function startLocalTick() {
     // Epoch countdown
     if (epochSlotsLeft != null && epochSlotsLeft > 0) {
       epochSlotsLeft--
-      const h = Math.floor(epochSlotsLeft / 3600), m = Math.floor((epochSlotsLeft % 3600) / 60), s = epochSlotsLeft % 60
-      setText('qs-next-epoch', `${h}h ${m}m ${s}s`)
+      setText('qs-next-epoch', formatCountdown(epochSlotsLeft))
       const sie = 432000 - epochSlotsLeft
       updateGauge('gauge-epoch', (sie / 432000) * 100, ((sie / 432000) * 100).toFixed(1) + '%', '#0053ff')
     }
@@ -871,9 +906,8 @@ function startLocalTick() {
     // Next assigned slot countdown
     if (window._nextSlotSlotsAway != null && window._nextSlotSlotsAway > 0) {
       window._nextSlotSlotsAway--
-      const ns = window._nextSlotSlotsAway
-      const h  = Math.floor(ns / 3600), m = Math.floor((ns % 3600) / 60), s = ns % 60
-      setText('bt-next-slot', `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`)
+      const ns   = window._nextSlotSlotsAway
+      setText('bt-next-slot', formatCountdown(ns))
       const nsEl = document.getElementById('bt-next-slot')
       if (nsEl) nsEl.style.color = ns < 30 ? 'var(--warning)' : 'var(--success)'
     } else if (window._nextSlotSlotsAway === 0) {

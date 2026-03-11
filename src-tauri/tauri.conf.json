@@ -55,10 +55,13 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 860,
         "resizable": true,
+        "center": true,
+        "minWidth": 1200,
+        "minHeight": 720,
         "title": "PoolManager",
-        "width": 800
+        "width": 1400
       }
     ]
   }
