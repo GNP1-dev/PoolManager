@@ -302,14 +302,14 @@ document.querySelector('#app').innerHTML = `
               <div class="kes-expiry" id="kes-expiry">Expires: --</div>
             </div>
             <div class="quick-stats">
-              <div class="qs-item"><span class="qs-label">Absolute Slot</span><span class="qs-val mono" id="qs-slot">--</span></div>
-              <div class="qs-item"><span class="qs-label">Block Height</span><span class="qs-val mono" id="qs-block">--</span></div>
+              <div class="qs-item"><span class="qs-label">Pool</span><span class="qs-val success" id="qs-pool">--</span></div>
+              <div class="qs-item"><span class="qs-label">Node Version</span><span class="qs-val" id="qs-version">--</span></div>
+              <div class="qs-item"><span class="qs-label">Era</span><span class="qs-val" id="qs-era">--</span></div>
               <div class="qs-item"><span class="qs-label">Epoch</span><span class="qs-val" id="qs-epoch">--</span></div>
               <div class="qs-item"><span class="qs-label">Slot in Epoch</span><span class="qs-val mono" id="qs-slot-ep">--</span></div>
+              <div class="qs-item"><span class="qs-label">Absolute Slot</span><span class="qs-val mono" id="qs-slot">--</span></div>
+              <div class="qs-item"><span class="qs-label">Block Height</span><span class="qs-val mono" id="qs-block">--</span></div>
               <div class="qs-item"><span class="qs-label">Next Epoch In</span><span class="qs-val" id="qs-next-epoch">--</span></div>
-              <div class="qs-item"><span class="qs-label">Era</span><span class="qs-val" id="qs-era">--</span></div>
-              <div class="qs-item"><span class="qs-label">Node Version</span><span class="qs-val" id="qs-version">--</span></div>
-              <div class="qs-item"><span class="qs-label">Pool</span><span class="qs-val success" id="qs-pool">--</span></div>
               <div class="qs-item"><span class="qs-label">Mempool TX</span><span class="qs-val mono" id="mc-mempool-tx">--</span></div>
               <div class="qs-item"><span class="qs-label">Mempool KB</span><span class="qs-val mono" id="mc-mempool-kb">--</span></div>
               <div class="qs-item"><span class="qs-label">Memory GB</span><span class="qs-val mono" id="mc-memory">--</span></div>
@@ -322,12 +322,83 @@ document.querySelector('#app').innerHTML = `
         <div class="section">
           <div class="section-title">Node Resources</div>
           <div class="metrics-row">
-            <div class="metric-card"><div class="mc-label">CPU %</div><div class="mc-value" id="mc-cpu">--%</div></div>
-            <div class="metric-card"><div class="mc-label">Node Mem</div><div class="mc-value" id="mc-mem-rss">--G</div></div>
-            <div class="metric-card"><div class="mc-label">Sys Mem %</div><div class="mc-value" id="mc-mem-pct">--%</div></div>
-            <div class="metric-card"><div class="mc-label">Disk %</div><div class="mc-value" id="mc-disk">--%</div></div>
-            <div class="metric-card"><div class="mc-label">Peers In</div><div class="mc-value" id="mc-peers-in">--</div></div>
-            <div class="metric-card"><div class="mc-label">Peers Out</div><div class="mc-value" id="mc-peers-out">--</div></div>
+
+            <!-- CPU: chip icon, centre square fills up -->
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <defs><clipPath id="cpu-clip"><rect id="cpu-fill-rect" x="4" y="4" width="12" height="12" rx="2"/></clipPath></defs>
+                <rect x="4" y="4" width="12" height="12" rx="2" stroke="#2d3148" stroke-width="1.5"/>
+                <rect x="4" y="4" width="12" height="12" rx="2" fill="#0053ff" opacity="0.15"/>
+                <rect id="cpu-fill-bar" x="4" y="16" width="12" height="0" rx="0" fill="#0053ff" clip-path="url(#cpu-clip)"/>
+                <rect x="7" y="7" width="6" height="6" rx="1" fill="#2d3148"/>
+                <line x1="7" y1="2" x2="7" y2="4" stroke="#6b7280" stroke-width="1.5"/><line x1="10" y1="2" x2="10" y2="4" stroke="#6b7280" stroke-width="1.5"/><line x1="13" y1="2" x2="13" y2="4" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="7" y1="16" x2="7" y2="18" stroke="#6b7280" stroke-width="1.5"/><line x1="10" y1="16" x2="10" y2="18" stroke="#6b7280" stroke-width="1.5"/><line x1="13" y1="16" x2="13" y2="18" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="2" y1="7" x2="4" y2="7" stroke="#6b7280" stroke-width="1.5"/><line x1="2" y1="10" x2="4" y2="10" stroke="#6b7280" stroke-width="1.5"/><line x1="2" y1="13" x2="4" y2="13" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="16" y1="7" x2="18" y2="7" stroke="#6b7280" stroke-width="1.5"/><line x1="16" y1="10" x2="18" y2="10" stroke="#6b7280" stroke-width="1.5"/><line x1="16" y1="13" x2="18" y2="13" stroke="#6b7280" stroke-width="1.5"/>
+              </svg>
+              <div class="mc-label">CPU %</div><div class="mc-value" id="mc-cpu">--%</div>
+            </div>
+
+            <!-- Node Mem: RAM stick, fills left to right -->
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <defs><clipPath id="rss-clip"><rect x="2" y="6" width="16" height="8" rx="1.5"/></clipPath></defs>
+                <rect x="2" y="6" width="16" height="8" rx="1.5" fill="#0a0c12" stroke="#2d3148" stroke-width="1.5"/>
+                <rect id="rss-fill-bar" x="2" y="6" width="0" height="8" rx="1.5" fill="#00c48c" opacity="0.4" clip-path="url(#rss-clip)"/>
+                <rect x="4" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/><rect x="7" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/>
+                <rect x="10" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/><rect x="13" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/>
+                <line x1="5" y1="4" x2="5" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="8" y1="4" x2="8" y2="6" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="11" y1="4" x2="11" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="14" y1="4" x2="14" y2="6" stroke="#6b7280" stroke-width="1.5"/>
+              </svg>
+              <div class="mc-label">Node Mem</div><div class="mc-value" id="mc-mem-rss">--G</div>
+            </div>
+
+            <!-- Sys Mem: RAM stick, fills left to right -->
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <defs><clipPath id="mem-clip"><rect x="2" y="6" width="16" height="8" rx="1.5"/></clipPath></defs>
+                <rect x="2" y="6" width="16" height="8" rx="1.5" fill="#0a0c12" stroke="#2d3148" stroke-width="1.5"/>
+                <rect id="mem-fill-bar" x="2" y="6" width="0" height="8" rx="1.5" fill="#00c48c" opacity="0.4" clip-path="url(#mem-clip)"/>
+                <rect x="4" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/><rect x="7" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/>
+                <rect x="10" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/><rect x="13" y="8" width="2" height="4" rx="0.5" fill="#6b7280"/>
+                <line x1="5" y1="4" x2="5" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="8" y1="4" x2="8" y2="6" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="11" y1="4" x2="11" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="14" y1="4" x2="14" y2="6" stroke="#6b7280" stroke-width="1.5"/>
+              </svg>
+              <div class="mc-label">Sys Mem %</div><div class="mc-value" id="mc-mem-pct">--%</div>
+            </div>
+
+            <!-- Disk: cylinder fills from bottom up -->
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <defs><clipPath id="disk-clip"><path d="M3 6.5v7C3 14.88 6.13 16 10 16s7-1.12 7-2.5v-7"/></clipPath></defs>
+                <path d="M3 6.5v7C3 14.88 6.13 16 10 16s7-1.12 7-2.5v-7" fill="#0a0c12" stroke="#2d3148" stroke-width="1.5"/>
+                <rect id="disk-fill-bar" x="3" y="16" width="14" height="0" fill="#00c48c" opacity="0.5" clip-path="url(#disk-clip)"/>
+                <ellipse cx="10" cy="6.5" rx="7" ry="2" stroke="#2d3148" stroke-width="1.5" fill="#0a0c12"/>
+                <ellipse cx="10" cy="6.5" rx="7" ry="2" stroke="#2d3148" stroke-width="1.5" fill="none"/>
+              </svg>
+              <div class="mc-label">Disk %</div><div class="mc-value" id="mc-disk">--%</div>
+            </div>
+
+            <!-- Peers In/Out: simple network icons, no fill needed -->
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <circle cx="10" cy="10" r="7" stroke="#6b7280" stroke-width="1.5"/>
+                <circle cx="10" cy="10" r="2" fill="#6b7280"/>
+                <line x1="10" y1="3" x2="10" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="10" y1="14" x2="10" y2="17" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="3" y1="10" x2="6" y2="10" stroke="#6b7280" stroke-width="1.5"/><line x1="14" y1="10" x2="17" y2="10" stroke="#6b7280" stroke-width="1.5"/>
+              </svg>
+              <div class="mc-label">Peers In</div><div class="mc-value" id="mc-peers-in">--</div>
+            </div>
+            <div class="metric-card">
+              <svg width="28" height="28" viewBox="0 0 20 20" fill="none" style="margin-bottom:4px">
+                <circle cx="10" cy="10" r="7" stroke="#6b7280" stroke-width="1.5"/>
+                <circle cx="10" cy="10" r="2" fill="#6b7280"/>
+                <line x1="10" y1="3" x2="10" y2="6" stroke="#6b7280" stroke-width="1.5"/><line x1="10" y1="14" x2="10" y2="17" stroke="#6b7280" stroke-width="1.5"/>
+                <line x1="3" y1="10" x2="6" y2="10" stroke="#6b7280" stroke-width="1.5"/><line x1="14" y1="10" x2="17" y2="10" stroke="#6b7280" stroke-width="1.5"/>
+              </svg>
+              <div class="mc-label">Peers Out</div><div class="mc-value" id="mc-peers-out">--</div>
+            </div>
+
           </div>
         </div>
 
@@ -336,7 +407,7 @@ document.querySelector('#app').innerHTML = `
 
           <!-- POOL & DELEGATION -->
           <div class="section" style="margin-bottom:0">
-            <div class="section-title">Pool &amp; Delegation <span class="koios-badge">Koios</span></div>
+            <div class="section-title">Pool &amp; Delegation <span class="koios-badge">Koios</span><span id="koios-age" style="font-size:10px;color:var(--text-muted);font-weight:400;margin-left:8px"></span></div>
             <div id="pool-data-loading" style="color:var(--text-muted);font-size:13px">Loading pool data...</div>
             <div id="pool-data-grid" class="pool-data-grid" style="display:none">
               <div class="pool-stat"><div class="ps-label">Live Stake</div><div class="ps-value" id="ps-live-stake">--</div></div>
@@ -345,8 +416,10 @@ document.querySelector('#app').innerHTML = `
               <div class="pool-stat"><div class="ps-label">Saturation</div><div class="ps-value" id="ps-saturation">--</div></div>
               <div class="pool-stat"><div class="ps-label">Blocks Lifetime</div><div class="ps-value success" id="ps-blocks">--</div></div>
               <div class="pool-stat"><div class="ps-label">Pledge</div><div class="ps-value" id="ps-pledge">--</div></div>
+              <div class="pool-stat"><div class="ps-label">Live Pledge</div><div class="ps-value" id="ps-live-pledge">--</div></div>
               <div class="pool-stat"><div class="ps-label">Margin</div><div class="ps-value" id="ps-margin">--</div></div>
               <div class="pool-stat"><div class="ps-label">Fixed Fee</div><div class="ps-value" id="ps-fee">--</div></div>
+              <div class="pool-stat"><div class="ps-label">Status</div><div class="ps-value" id="ps-status">--</div></div>
             </div>
           </div>
 
@@ -356,6 +429,7 @@ document.querySelector('#app').innerHTML = `
               Block Activity
               <span id="cncli-badge" style="display:none;font-size:9px;background:rgba(0,196,140,0.12);color:var(--success);border:1px solid rgba(0,196,140,0.25);border-radius:10px;padding:1px 6px;letter-spacing:0.5px;font-weight:600;margin-left:4px">cncli</span>
               <span id="cncli-missing" style="font-size:9px;background:rgba(255,184,0,0.12);color:var(--warning);border:1px solid rgba(255,184,0,0.25);border-radius:10px;padding:1px 6px;letter-spacing:0.5px;font-weight:600;margin-left:4px">cncli not found</span>
+              <span id="slots-remaining-badge" style="display:none;font-size:9px;color:var(--text-muted);margin-left:8px" id="slots-remaining-badge"></span>
             </div>
 
             <!-- 6-stat row -->
@@ -368,24 +442,36 @@ document.querySelector('#app').innerHTML = `
               <div class="bes-stat-card"><div class="bsc-label">Lost</div><div class="bsc-val" id="bsc-lost">--</div></div>
             </div>
 
-            <!-- Dual countdowns -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div class="block-timer-wrap">
-                <div class="bt-label">Next Assigned Slot In</div>
-                <svg viewBox="0 0 100 100" width="100" height="100" id="slot-ring-svg" style="display:block;margin:6px auto">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#1a1e2e" stroke-width="6"/>
-                  <circle id="slot-ring-arc" cx="50" cy="50" r="42" fill="none" stroke="#2d3148"
-                    stroke-width="6" stroke-dasharray="0 264" stroke-dashoffset="0"
-                    transform="rotate(-90 50 50)" stroke-linecap="round"/>
-                </svg>
-                <div class="bt-time" id="bt-next-slot" style="font-size:17px;letter-spacing:1px;margin-top:2px">--:--:--</div>
-                <div class="bt-sub" id="bt-next-slot-abs" style="font-size:10px">--</div>
+            <!-- Slot countdowns + chain timer -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 180px;gap:8px;margin-top:10px">
+
+              <!-- Next slot -->
+              <div class="block-timer-wrap" style="padding:10px 14px">
+                <div class="bt-label" id="bt-slot1-label">Next Assigned Slot</div>
+                <div style="font-size:18px;font-weight:700;font-family:'Courier New',monospace;color:var(--success);margin:4px 0 6px" id="bt-next-slot">--:--:--</div>
+                <div style="background:#0a0c12;border-radius:4px;height:6px;overflow:hidden">
+                  <div id="bt-slot1-bar" style="height:100%;width:0%;background:var(--success);border-radius:4px;transition:width 1s linear"></div>
+                </div>
+                <div class="bt-sub" id="bt-next-slot-abs" style="font-size:10px;margin-top:4px">--</div>
               </div>
-              <div class="block-timer-wrap">
-                <div class="bt-label">Time Since Last Chain Block</div>
-                <div class="bt-time" id="bt-time">--:--:--</div>
-                <div class="bt-sub" id="bt-sub">Block #--</div>
+
+              <!-- Slot after next -->
+              <div class="block-timer-wrap" style="padding:10px 14px">
+                <div class="bt-label" id="bt-slot2-label">Slot After Next</div>
+                <div style="font-size:18px;font-weight:700;font-family:'Courier New',monospace;color:var(--success);margin:4px 0 6px" id="bt-next-slot2">--:--:--</div>
+                <div style="background:#0a0c12;border-radius:4px;height:6px;overflow:hidden">
+                  <div id="bt-slot2-bar" style="height:100%;width:0%;background:var(--success);border-radius:4px;transition:width 1s linear"></div>
+                </div>
+                <div class="bt-sub" id="bt-next-slot2-abs" style="font-size:10px;margin-top:4px">--</div>
               </div>
+
+              <!-- Time since last chain block (compact) -->
+              <div class="block-timer-wrap" style="padding:10px 14px">
+                <div class="bt-label">Last Block</div>
+                <div style="font-size:18px;font-weight:700;font-family:'Courier New',monospace;color:var(--success);margin:4px 0 2px" id="bt-time">--:--:--</div>
+                <div class="bt-sub" id="bt-sub" style="font-size:10px">Block #--</div>
+              </div>
+
             </div>
           </div>
 
@@ -722,6 +808,10 @@ async function fetchKoiosData() {
     if (loadingEl) loadingEl.style.display = 'none'
     if (gridEl)    gridEl.style.display    = 'grid'
 
+    // Stamp last-updated time
+    const koiosAge = document.getElementById('koios-age')
+    if (koiosAge) koiosAge.textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+
     setText('ps-live-stake',   formatADA(p.live_stake))
     setText('ps-active-stake', formatADA(p.active_stake))
     setText('ps-delegators',   (p.live_delegators ?? '--').toString())
@@ -754,9 +844,18 @@ async function fetchKoiosData() {
     }
 
     setText('ps-blocks', (p.block_count ?? '--').toString())
-    setText('ps-pledge',  formatADA(p.pledge))
+    setText('ps-pledge',      formatADA(p.pledge))
+    setText('ps-live-pledge', formatADA(p.live_pledge))
     setText('ps-margin',  p.margin != null ? (parseFloat(p.margin) * 100).toFixed(2) + '%' : '--')
     setText('ps-fee',     p.fixed_cost ? (parseInt(p.fixed_cost) / 1_000_000).toFixed(0) + ' ₳' : '--')
+
+    // Pool status
+    const status = p.pool_status || '--'
+    const statusEl = document.getElementById('ps-status')
+    if (statusEl) {
+      statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1)
+      statusEl.className = 'ps-value' + (status === 'registered' ? ' success' : status === 'retiring' ? ' danger' : '')
+    }
 
     if (p.live_saturation != null) {
       const pct   = parseFloat(p.live_saturation)
@@ -789,9 +888,9 @@ async function fetchCncliData() {
       if (el) { el.textContent = '--'; el.className = 'bsc-val' }
     })
     setText('bt-next-slot',     '--:--:--')
+    setText('bt-next-slot2',    '--:--:--')
     setText('bt-next-slot-abs', 'cncli not installed — leader schedule unavailable')
-    const ringArcNC = document.getElementById('slot-ring-arc')
-    if (ringArcNC) { ringArcNC.setAttribute('stroke-dasharray', '0 264'); ringArcNC.setAttribute('stroke', '#2d3148') }
+    setText('bt-next-slot2-abs','')
     return
   }
 
@@ -857,23 +956,42 @@ async function fetchCncliData() {
       setText('bsc-lost',      '0')
     }
 
-    // Next slot countdown
+    // Next 2 slot countdowns
     const futureSlots = slotList.filter(sl => sl > currentSlot).sort((a, b) => a - b)
+    const badge = document.getElementById('slots-remaining-badge')
+    if (badge) {
+      badge.style.display = futureSlots.length > 0 ? 'inline' : 'none'
+      badge.textContent   = futureSlots.length + ' slot' + (futureSlots.length !== 1 ? 's' : '') + ' remaining this epoch'
+    }
+
     if (futureSlots.length > 0) {
-      // Store original distance only when the target slot changes
-      if (window._nextSlotAbs !== futureSlots[0]) {
-        window._nextSlotOriginalDistance = futureSlots[0] - currentSlot
-      }
+      if (window._nextSlotAbs !== futureSlots[0]) window._nextSlotOriginalDistance = futureSlots[0] - currentSlot
       window._nextSlotSlotsAway = futureSlots[0] - currentSlot
       window._nextSlotAbs       = futureSlots[0]
-      setText('bt-next-slot-abs', 'Slot ' + futureSlots[0].toLocaleString() + ' (' + futureSlots.length + ' remaining)')
+      setText('bt-next-slot-abs', 'Slot ' + futureSlots[0].toLocaleString())
+      setText('bt-slot1-label',   'Next Assigned Slot')
     } else {
-      window._nextSlotSlotsAway = null
-      window._nextSlotOriginalDistance = null
-      const ringArc = document.getElementById('slot-ring-arc')
-      if (ringArc) { ringArc.setAttribute('stroke-dasharray', '0 264'); ringArc.setAttribute('stroke', '#2d3148') }
-      setText('bt-next-slot',     'No slots')
+      window._nextSlotSlotsAway        = null
+      window._nextSlotOriginalDistance  = null
+      const bar1 = document.getElementById('bt-slot1-bar')
+      if (bar1) { bar1.style.width = '0%'; bar1.style.background = 'var(--text-muted)' }
+      setText('bt-next-slot',     leaderCount > 0 ? 'All done' : 'No slots')
       setText('bt-next-slot-abs', leaderCount > 0 ? 'All slots passed this epoch' : 'No slots this epoch')
+    }
+
+    if (futureSlots.length > 1) {
+      if (window._nextSlot2Abs !== futureSlots[1]) window._nextSlot2OriginalDistance = futureSlots[1] - currentSlot
+      window._nextSlot2SlotsAway = futureSlots[1] - currentSlot
+      window._nextSlot2Abs       = futureSlots[1]
+      setText('bt-next-slot2-abs', 'Slot ' + futureSlots[1].toLocaleString())
+      setText('bt-slot2-label',    'Slot After Next')
+    } else {
+      window._nextSlot2SlotsAway       = null
+      window._nextSlot2OriginalDistance = null
+      const bar2 = document.getElementById('bt-slot2-bar')
+      if (bar2) { bar2.style.width = '0%'; bar2.style.background = 'var(--text-muted)' }
+      setText('bt-next-slot2',     '--')
+      setText('bt-next-slot2-abs', futureSlots.length === 1 ? 'No further slots' : '--')
     }
   } catch(e) { console.error('cncli fetch error:', e) }
 }
@@ -924,27 +1042,38 @@ function startLocalTick() {
       if (btEl) btEl.style.color = elapsed > 180 ? 'var(--danger)' : elapsed > 60 ? 'var(--warning)' : 'var(--success)'
     }
 
-    // Next assigned slot countdown
+    // Slot 1 countdown + progress bar (based on full 432000 slot epoch)
     if (window._nextSlotSlotsAway != null && window._nextSlotSlotsAway > 0) {
       window._nextSlotSlotsAway--
-      const ns   = window._nextSlotSlotsAway
+      const ns    = window._nextSlotSlotsAway
+      const color = ns < 43200 ? 'var(--danger)' : ns < 86400 ? 'var(--warning)' : 'var(--success)'
       setText('bt-next-slot', formatCountdown(ns))
       const nsEl = document.getElementById('bt-next-slot')
-      if (nsEl) nsEl.style.color = ns < 30 ? 'var(--warning)' : 'var(--success)'
-
-      // Update countdown ring
-      const ringArc = document.getElementById('slot-ring-arc')
-      if (ringArc && window._nextSlotOriginalDistance > 0) {
-        const pct   = Math.max(0, ns / window._nextSlotOriginalDistance)
-        const circ  = 264
-        ringArc.setAttribute('stroke-dasharray', `${(pct * circ).toFixed(1)} ${circ}`)
-        const color = ns < 30 ? '#ff4d4d' : ns < 1800 ? '#ffb800' : '#00c48c'
-        ringArc.setAttribute('stroke', color)
-        if (ns < 30) ringArc.classList.add('slot-pulse')
-        else         ringArc.classList.remove('slot-pulse')
+      if (nsEl) nsEl.style.color = color
+      const bar1 = document.getElementById('bt-slot1-bar')
+      if (bar1) {
+        bar1.style.width      = Math.max(0, (ns / 432000) * 100).toFixed(2) + '%'
+        bar1.style.background = color
       }
     } else if (window._nextSlotSlotsAway === 0) {
       setText('bt-next-slot', '00:00:00')
+    }
+
+    // Slot 2 countdown + progress bar (based on full 432000 slot epoch)
+    if (window._nextSlot2SlotsAway != null && window._nextSlot2SlotsAway > 0) {
+      window._nextSlot2SlotsAway--
+      const ns2    = window._nextSlot2SlotsAway
+      const color2 = ns2 < 43200 ? 'var(--danger)' : ns2 < 86400 ? 'var(--warning)' : 'var(--success)'
+      setText('bt-next-slot2', formatCountdown(ns2))
+      const ns2El = document.getElementById('bt-next-slot2')
+      if (ns2El) ns2El.style.color = color2
+      const bar2 = document.getElementById('bt-slot2-bar')
+      if (bar2) {
+        bar2.style.width      = Math.max(0, (ns2 / 432000) * 100).toFixed(2) + '%'
+        bar2.style.background = color2
+      }
+    } else if (window._nextSlot2SlotsAway === 0) {
+      setText('bt-next-slot2', '00:00:00')
     }
 
   }, 1000)
@@ -964,27 +1093,74 @@ async function fetchResourcesData() {
         // Node RSS from ps (matches gLiveView Mem RSS)
         `BPID=$(ss -tnlp 2>/dev/null | grep ":${nodePort} " | grep -o "pid=[0-9]*" | grep -o "[0-9]*" | head -1); ` +
         `RSS=$(ps -q $BPID -o rss= 2>/dev/null | awk '{printf "%.1f", $1/1048576}'); ` +
-        // System memory %
+        // System memory % and total RAM in GB
         `MEM=$(free -m 2>/dev/null | awk 'NR==2{printf "%.1f", $3/$2*100}'); ` +
+        `TOTALRAM=$(free -m 2>/dev/null | awk 'NR==2{printf "%.1f", $2/1024}'); ` +
         // Disk % for cnode home partition
         `DISK=$(df "${home}" 2>/dev/null | awk 'NR==2{print $5}' | tr -d '%'); ` +
-        `echo "$CPU $RSS $MEM $DISK"`
+        `echo "$CPU $RSS $MEM $DISK $TOTALRAM"`
     })
-    const parts = (r.output || '').trim().split(' ')
-    const cpu  = parseFloat(parts[0])
-    const rss  = parseFloat(parts[1])
-    const mem  = parseFloat(parts[2])
-    const disk = parseFloat(parts[3])
+    const parts    = (r.output || '').trim().split(' ')
+    const cpu      = parseFloat(parts[0])
+    const rss      = parseFloat(parts[1])
+    const mem      = parseFloat(parts[2])
+    const disk     = parseFloat(parts[3])
+    const totalRam = parseFloat(parts[4])
 
     const cpuEl  = document.getElementById('mc-cpu')
     const rssEl  = document.getElementById('mc-mem-rss')
     const memEl  = document.getElementById('mc-mem-pct')
     const diskEl = document.getElementById('mc-disk')
 
-    if (!isNaN(cpu)  && cpuEl)  { cpuEl.textContent  = cpu.toFixed(1) + '%';  cpuEl.className  = 'mc-value' + (cpu  > 90 ? ' danger' : cpu  > 70 ? ' warning' : '') }
-    if (!isNaN(rss)  && rssEl)  { rssEl.textContent  = rss.toFixed(1) + 'G';  rssEl.className  = 'mc-value' }
-    if (!isNaN(mem)  && memEl)  { memEl.textContent  = mem.toFixed(1) + '%';  memEl.className  = 'mc-value' + (mem  > 90 ? ' danger' : mem  > 70 ? ' warning' : '') }
-    if (!isNaN(disk) && diskEl) { diskEl.textContent = disk.toFixed(0) + '%'; diskEl.className = 'mc-value' + (disk > 90 ? ' danger' : disk > 70 ? ' warning' : '') }
+    const svgColor = (pct) => pct > 90 ? '#ff4d4d' : pct > 70 ? '#ffb800' : '#00c48c'
+
+    if (!isNaN(cpu) && cpuEl) {
+      cpuEl.textContent = cpu.toFixed(1) + '%'
+      cpuEl.className   = 'mc-value' + (cpu > 90 ? ' danger' : cpu > 70 ? ' warning' : '')
+      // CPU chip: fill bar rises from bottom of the 12x12 inner box (y4→y16), height = 12*pct
+      const cpuBar = document.getElementById('cpu-fill-bar')
+      if (cpuBar) {
+        const h = (cpu / 100) * 12
+        cpuBar.setAttribute('y',      (16 - h).toFixed(2))
+        cpuBar.setAttribute('height', h.toFixed(2))
+        cpuBar.setAttribute('fill',   svgColor(cpu))
+      }
+    }
+
+    if (!isNaN(rss) && rssEl) {
+      rssEl.textContent = rss.toFixed(1) + 'G'
+      rssEl.className   = 'mc-value'
+      const rssBar = document.getElementById('rss-fill-bar')
+      if (rssBar && !isNaN(totalRam) && totalRam > 0) {
+        const rssPct = Math.min(100, (rss / totalRam) * 100)
+        rssBar.setAttribute('width', ((rssPct / 100) * 16).toFixed(2))
+        rssBar.setAttribute('fill',  svgColor(rssPct))
+      }
+    }
+
+    if (!isNaN(mem) && memEl) {
+      memEl.textContent = mem.toFixed(1) + '%'
+      memEl.className   = 'mc-value' + (mem > 90 ? ' danger' : mem > 70 ? ' warning' : '')
+      // Sys mem RAM: fill left to right within 16px wide bar
+      const memBar = document.getElementById('mem-fill-bar')
+      if (memBar) {
+        memBar.setAttribute('width', ((mem / 100) * 16).toFixed(2))
+        memBar.setAttribute('fill',  svgColor(mem))
+      }
+    }
+
+    if (!isNaN(disk) && diskEl) {
+      diskEl.textContent = disk.toFixed(0) + '%'
+      diskEl.className   = 'mc-value' + (disk > 90 ? ' danger' : disk > 70 ? ' warning' : '')
+      // Disk cylinder: body runs y=6.5 to y=16 (height=9.5), fill rises from bottom
+      const diskBar = document.getElementById('disk-fill-bar')
+      if (diskBar) {
+        const h = (disk / 100) * 9.5
+        diskBar.setAttribute('y',      (16 - h).toFixed(2))
+        diskBar.setAttribute('height', h.toFixed(2))
+        diskBar.setAttribute('fill',   svgColor(disk))
+      }
+    }
 
     // Also update Prometheus Memory GB card with RSS if Prometheus hasn't populated it
     if (!isNaN(rss)) {
@@ -1032,8 +1208,15 @@ async function loadDashboard() {
     }
   } catch(e) {}
 
-  if (kesFetchCounter === 0) { fetchKESData(); fetchKoiosData() }
+  if (kesFetchCounter === 0) { fetchKESData() }
   kesFetchCounter = (kesFetchCounter + 1) % 10
+
+  // Koios: pool data changes at most once per epoch — only fetch if stale (>30 min)
+  const now = Date.now()
+  if (!window._lastKoiosFetch || (now - window._lastKoiosFetch) > 30 * 60 * 1000) {
+    window._lastKoiosFetch = now
+    fetchKoiosData()
+  }
 
   fetchCncliData()
   fetchPeersData()

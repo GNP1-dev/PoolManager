@@ -231,14 +231,14 @@ select option { background: var(--bg-card); }
 .qs-val.warning { color: var(--warning); }
 .qs-val.danger  { color: var(--danger); }
 
-/* ── NODE METRICS ROW ── */
+/* ── NODE RESOURCES ROW ── */
 .metrics-row {
-  display: flex; gap: 10px;
+  display: flex; gap: 10px; flex-wrap: wrap;
 }
 .metric-card {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: 8px; padding: 11px 10px; text-align: center;
-  min-width: 120px; flex: 0 0 auto;
+  min-width: 100px; flex: 1;
 }
 .mc-label {
   font-size: 9px; font-weight: 700; text-transform: uppercase;
@@ -259,7 +259,7 @@ select option { background: var(--bg-card); }
 
 /* ── POOL DATA ── */
 .pool-data-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
 }
 .pool-stat {
   background: var(--bg-card); border: 1px solid var(--border);
@@ -378,13 +378,3 @@ select option { background: var(--bg-card); }
 .bsc-val.success { color: var(--success); }
 .bsc-val.warning { color: var(--warning); }
 .bsc-val.danger  { color: var(--danger); }
-
-/* ── SLOT COUNTDOWN RING ── */
-@keyframes ring-pulse {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.25; }
-  100% { opacity: 1; }
-}
-.slot-pulse {
-  animation: ring-pulse 0.6s ease-in-out infinite;
-}
